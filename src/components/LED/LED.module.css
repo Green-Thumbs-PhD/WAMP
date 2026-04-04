@@ -1,0 +1,16 @@
+.led {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  transition: all 0.1s ease;
+  border: 1px solid #222;
+}
+
+.active {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.8; }
+}

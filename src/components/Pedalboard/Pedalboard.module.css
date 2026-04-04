@@ -1,0 +1,33 @@
+.board {
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 24px;
+  background:
+    radial-gradient(ellipse at center, rgba(40, 35, 30, 0.8) 0%, rgba(15, 12, 10, 0.95) 100%),
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(60, 50, 40, 0.15) 2px,
+      rgba(60, 50, 40, 0.15) 4px
+    );
+  background-color: #1a1510;
+  border-top: 1px solid #333;
+  border-bottom: 1px solid #333;
+}
+
+.chain {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  min-height: 320px;
+  padding: 8px 0;
+}
+
+.empty {
+  color: #555;
+  font-size: 14px;
+  padding: 0 20px;
+  white-space: nowrap;
+}
