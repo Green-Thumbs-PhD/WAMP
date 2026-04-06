@@ -1,40 +1,263 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AudioEngine } from '../audio/AudioEngine';
 import type { EffectType, EffectSlotState } from '../types/effects';
-import type { PresetEffectSlot } from '../types/presets';
-import { loadLastState, saveLastState } from '../audio/presets';
+import type { PresetEffectSlot, RigSnapshot } from '../types/presets';
+import type { RackState } from '../types/rack';
+import { normalizeRackState } from '../types/rack';
+import { loadLastSession, saveLastSession } from '../storage/appStorage';
 import type { LooperStatus } from '../audio/PostChainLooper';
+import type { CabinetIrSummary } from '../types/cabinetIr';
+import type { TunerSnapshot } from '../types/tuner';
+import {
+  deleteCabinetIr,
+  getCabinetIr,
+  listCabinetIrs,
+  renameCabinetIr,
+  saveCabinetIr,
+} from '../storage/cabinetIrStorage';
+
+function toPresetSlots(chain: EffectSlotState[]): PresetEffectSlot[] {
+  return chain.map((slot) => ({
+    type: slot.type,
+    bypassed: slot.bypassed,
+    params: slot.params,
+  }));
+}
 
 export function useAudioEngine() {
+  const initialSessionRef = useRef<RigSnapshot | null>(loadLastSession());
   const engineRef = useRef<AudioEngine>(new AudioEngine());
+  const sessionChainRef = useRef<PresetEffectSlot[]>(initialSessionRef.current?.chain ?? []);
+  const sessionRackRef = useRef<RackState>(normalizeRackState(initialSessionRef.current?.rack));
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const copiedPedalRef = useRef<PresetEffectSlot | null>(null);
+  const stabilizedFrequencyRef = useRef<number | null>(null);
+  const recentNotesRef = useRef<string[]>([]);
+
   const [isRunning, setIsRunning] = useState(false);
   const [chain, setChain] = useState<EffectSlotState[]>([]);
-  const [masterVolume, setMasterVolumeState] = useState(1);
+  const [lockedPedalIds, setLockedPedalIds] = useState<string[]>([]);
+  const [masterVolume, setMasterVolumeState] = useState(sessionRackRef.current.masterVolume);
+  const [inputTrim, setInputTrimState] = useState(sessionRackRef.current.inputTrim);
+  const [muted, setMutedState] = useState(sessionRackRef.current.muted);
+  const [ampChannel, setAmpChannelState] = useState(sessionRackRef.current.ampChannel);
+  const [ampPresence, setAmpPresenceState] = useState(sessionRackRef.current.ampPresence);
+  const [ampLevel, setAmpLevelState] = useState(sessionRackRef.current.ampLevel);
   const [inputLevel, setInputLevel] = useState(0);
   const [outputLevel, setOutputLevel] = useState(0);
+  const [outputPeak, setOutputPeak] = useState(0);
+  const [tuner, setTuner] = useState<TunerSnapshot>({
+    frequency: null,
+    stabilizedFrequency: null,
+    clarity: 0,
+    signal: 0,
+    recentNotes: [],
+  });
   const [contextState, setContextState] = useState<AudioContextState | null>(null);
   const [looperStatus, setLooperStatus] = useState<LooperStatus>('idle');
   const [looperDuration, setLooperDuration] = useState(0);
-  const [metronomeBpm, setMetronomeBpmState] = useState(120);
-  const [metronomeRunning, setMetronomeRunning] = useState(false);
-  const [padsThroughChain, setPadsThroughChainState] = useState(false);
-  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const [metronomeBpm, setMetronomeBpmState] = useState(sessionRackRef.current.metronomeBpm);
+  const [metronomeRunning, setMetronomeRunning] = useState(sessionRackRef.current.metronomeRunning);
+  const [padsThroughChain, setPadsThroughChainState] = useState(sessionRackRef.current.padsThroughChain);
+  const [globalNoiseGateEnabled, setGlobalNoiseGateEnabledState] = useState(sessionRackRef.current.globalNoiseGateEnabled);
+  const [globalNoiseGateThreshold, setGlobalNoiseGateThresholdState] = useState(sessionRackRef.current.globalNoiseGateThreshold);
+  const [globalNoiseGateRelease, setGlobalNoiseGateReleaseState] = useState(sessionRackRef.current.globalNoiseGateRelease);
+  const [globalNoiseGateReduction, setGlobalNoiseGateReductionState] = useState(sessionRackRef.current.globalNoiseGateReduction);
+  const [cabinetIrLibrary, setCabinetIrLibrary] = useState<CabinetIrSummary[]>([]);
+  const [cabinetIrLibraryBusy, setCabinetIrLibraryBusy] = useState(false);
+  const [cabinetIrActiveId, setCabinetIrActiveId] = useState(sessionRackRef.current.cabinetIrId);
+  const [cabinetIrName, setCabinetIrName] = useState(sessionRackRef.current.cabinetIrName);
+  const [cabinetIrEnabled, setCabinetIrEnabledState] = useState(sessionRackRef.current.cabinetIrEnabled);
+  const [cabinetIrMix, setCabinetIrMixState] = useState(sessionRackRef.current.cabinetIrMix);
+  const [outputRecorderActive, setOutputRecorderActive] = useState(false);
+  const [outputRecorderDuration, setOutputRecorderDuration] = useState(0);
+  const [lastRecordingUrl, setLastRecordingUrl] = useState('');
+  const [lastRecordingName, setLastRecordingName] = useState('');
+  const [performanceSnapshot, setPerformanceSnapshot] = useState({
+    baseLatencyMs: 0,
+    outputLatencyMs: 0,
+    sampleRate: 0,
+    activeNodes: 0,
+    averageFrameMs: 0,
+    estimatedCpuLoad: 0,
+  });
+  const outputRecordingStartedAtRef = useRef<number | null>(null);
+  const lastFrameTimeRef = useRef<number | null>(null);
+  const averageFrameMsRef = useRef(0);
+
+  const updateTunerSnapshot = useCallback((frequency: number | null, clarity: number, signal: number) => {
+    const previous = stabilizedFrequencyRef.current;
+    let stabilized = previous;
+
+    if (!frequency) {
+      stabilized = previous && clarity > 0.12 ? previous : null;
+    } else if (!previous) {
+      stabilized = frequency;
+    } else {
+      const blend = Math.abs(frequency - previous) < previous * 0.06 ? 0.2 : 0.5;
+      stabilized = previous + (frequency - previous) * blend;
+    }
+
+    stabilizedFrequencyRef.current = stabilized;
+
+    if (stabilized && clarity > 0.5) {
+      const midi = Math.round(69 + 12 * Math.log2(stabilized / 440));
+      const note = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'][((midi % 12) + 12) % 12] ?? '--';
+      recentNotesRef.current = [note, ...recentNotesRef.current.filter((entry) => entry !== note)].slice(0, 4);
+    }
+
+    setTuner({
+      frequency,
+      stabilizedFrequency: stabilized,
+      clarity,
+      signal,
+      recentNotes: recentNotesRef.current,
+    });
+  }, []);
+
+  const queueSessionSave = useCallback(() => {
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => {
+      saveLastSession({
+        chain: sessionChainRef.current,
+        rack: sessionRackRef.current,
+      });
+    }, 300);
+  }, []);
+
+  const updateSessionRack = useCallback((partial: Partial<RackState>) => {
+    sessionRackRef.current = {
+      ...sessionRackRef.current,
+      ...partial,
+    };
+    queueSessionSave();
+  }, [queueSessionSave]);
 
   const syncChain = useCallback(() => {
     const state = engineRef.current.getChainState();
     setChain(state);
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    saveTimeoutRef.current = setTimeout(() => {
-      saveLastState(
-        state.map((s) => ({ type: s.type, bypassed: s.bypassed, params: s.params }))
-      );
-    }, 500);
-  }, []);
+    setLockedPedalIds((current) => current.filter((id) => state.some((slot) => slot.id === id)));
+    sessionChainRef.current = toPresetSlots(state);
+    queueSessionSave();
+  }, [queueSessionSave]);
 
   const syncLooper = useCallback(() => {
     setLooperStatus(engineRef.current.getLooperStatus());
     setLooperDuration(engineRef.current.getLooperDuration());
   }, []);
+
+  const getRackState = useCallback((): RackState => {
+    return normalizeRackState(sessionRackRef.current);
+  }, []);
+
+  const refreshCabinetIrLibrary = useCallback(async () => {
+    setCabinetIrLibrary(await listCabinetIrs());
+  }, []);
+
+  const clearCabinetIrSelection = useCallback((enabled = false) => {
+    engineRef.current.clearCabinetIr();
+    setCabinetIrActiveId('');
+    setCabinetIrName('');
+    setCabinetIrEnabledState(enabled ? engineRef.current.isCabinetIrEnabled() : false);
+    updateSessionRack({
+      cabinetIrId: '',
+      cabinetIrName: '',
+      cabinetIrEnabled: enabled ? engineRef.current.isCabinetIrEnabled() : false,
+    });
+  }, [updateSessionRack]);
+
+  const restoreCabinetIrSelection = useCallback(async (id: string, enabled = true) => {
+    const record = await getCabinetIr(id);
+    if (!record) {
+      clearCabinetIrSelection(false);
+      await refreshCabinetIrLibrary();
+      return null;
+    }
+
+    if (engineRef.current.isRunning()) {
+      const loaded = await engineRef.current.loadCabinetIrBuffer(record.data, record.name);
+      if (!loaded) return null;
+      engineRef.current.setCabinetIrEnabled(enabled);
+    }
+
+    setCabinetIrActiveId(record.id);
+    setCabinetIrName(record.name);
+    setCabinetIrEnabledState(engineRef.current.isRunning() ? engineRef.current.isCabinetIrEnabled() : enabled);
+    updateSessionRack({
+      cabinetIrId: record.id,
+      cabinetIrName: record.name,
+      cabinetIrEnabled: engineRef.current.isRunning() ? engineRef.current.isCabinetIrEnabled() : enabled,
+    });
+
+    return record;
+  }, [clearCabinetIrSelection, refreshCabinetIrLibrary, updateSessionRack]);
+
+  const applyRackState = useCallback((rack?: Partial<RackState>) => {
+    const nextRack = normalizeRackState(rack);
+
+    engineRef.current.setMasterVolume(nextRack.masterVolume);
+    engineRef.current.setInputTrim(nextRack.inputTrim);
+    engineRef.current.setMuted(nextRack.muted);
+    engineRef.current.setAmpChannel(nextRack.ampChannel);
+    engineRef.current.setAmpPresence(nextRack.ampPresence);
+    engineRef.current.setAmpLevel(nextRack.ampLevel);
+    engineRef.current.setMetronomeBpm(nextRack.metronomeBpm);
+    engineRef.current.setPadsThroughChain(nextRack.padsThroughChain);
+    engineRef.current.setGlobalNoiseGateEnabled(nextRack.globalNoiseGateEnabled);
+    engineRef.current.setGlobalNoiseGateThreshold(nextRack.globalNoiseGateThreshold);
+    engineRef.current.setGlobalNoiseGateRelease(nextRack.globalNoiseGateRelease);
+    engineRef.current.setGlobalNoiseGateReduction(nextRack.globalNoiseGateReduction);
+    engineRef.current.setCabinetIrMix(nextRack.cabinetIrMix);
+    engineRef.current.setCabinetIrEnabled(nextRack.cabinetIrEnabled && engineRef.current.hasCabinetIr());
+
+    if (nextRack.metronomeRunning) engineRef.current.metronomeStart();
+    else engineRef.current.metronomeStop();
+
+    setMasterVolumeState(nextRack.masterVolume);
+    setInputTrimState(nextRack.inputTrim);
+    setMutedState(nextRack.muted);
+    setAmpChannelState(engineRef.current.getAmpChannel());
+    setAmpPresenceState(engineRef.current.getAmpPresence());
+    setAmpLevelState(engineRef.current.getAmpLevel());
+    setMetronomeBpmState(engineRef.current.getMetronomeBpm());
+    setMetronomeRunning(engineRef.current.isMetronomeRunning());
+    setPadsThroughChainState(nextRack.padsThroughChain);
+    setGlobalNoiseGateEnabledState(engineRef.current.isGlobalNoiseGateEnabled());
+    setGlobalNoiseGateThresholdState(engineRef.current.getGlobalNoiseGateThreshold());
+    setGlobalNoiseGateReleaseState(engineRef.current.getGlobalNoiseGateRelease());
+    setGlobalNoiseGateReductionState(engineRef.current.getGlobalNoiseGateReduction());
+    setCabinetIrActiveId(nextRack.cabinetIrId);
+    setCabinetIrMixState(engineRef.current.getCabinetIrMix());
+    setCabinetIrEnabledState(engineRef.current.isCabinetIrEnabled());
+    setCabinetIrName(engineRef.current.getCabinetIrName() || nextRack.cabinetIrName);
+
+    updateSessionRack({
+      ...nextRack,
+      cabinetIrId: nextRack.cabinetIrId,
+      cabinetIrEnabled: engineRef.current.isCabinetIrEnabled(),
+      cabinetIrName: engineRef.current.getCabinetIrName() || nextRack.cabinetIrName,
+    });
+  }, [updateSessionRack]);
+
+  const applyRigSnapshot = useCallback(async (snapshot: RigSnapshot) => {
+    const nextRack = normalizeRackState(snapshot.rack);
+    if (nextRack.cabinetIrId) {
+      await restoreCabinetIrSelection(nextRack.cabinetIrId, nextRack.cabinetIrEnabled);
+    } else {
+      clearCabinetIrSelection(false);
+    }
+    engineRef.current.clearChain();
+    for (const slot of snapshot.chain) {
+      const effect = engineRef.current.addEffect(slot.type, slot.params);
+      if (slot.bypassed) effect.setBypassed(true);
+    }
+    syncChain();
+    applyRackState(nextRack);
+  }, [applyRackState, clearCabinetIrSelection, restoreCabinetIrSelection, syncChain]);
+
+  useEffect(() => {
+    void refreshCabinetIrLibrary();
+  }, [refreshCabinetIrLibrary]);
 
   useEffect(() => {
     const eng = engineRef.current;
@@ -43,35 +266,31 @@ export function useAudioEngine() {
   }, []);
 
   const start = useCallback(
-    async (deviceId?: string, presetChainOverride?: PresetEffectSlot[]) => {
+    async (deviceId?: string, presetOverride?: RigSnapshot) => {
+      engineRef.current.setMasterVolume(sessionRackRef.current.masterVolume);
       await engineRef.current.start(deviceId);
       setIsRunning(true);
       setContextState(engineRef.current.getContextState());
 
-      if (presetChainOverride && presetChainOverride.length > 0) {
-        engineRef.current.clearChain();
-        for (const slot of presetChainOverride) {
-          const effect = engineRef.current.addEffect(slot.type, slot.params);
-          if (slot.bypassed) effect.setBypassed(true);
-        }
-        syncChain();
+      const snapshotToApply = presetOverride ?? initialSessionRef.current;
+      const targetRack = normalizeRackState(snapshotToApply?.rack ?? sessionRackRef.current);
+      if (snapshotToApply) {
+        await applyRigSnapshot(snapshotToApply);
       } else {
-        const lastState = loadLastState();
-        if (lastState && lastState.length > 0) {
-          for (const slot of lastState) {
-            const effect = engineRef.current.addEffect(slot.type, slot.params);
-            if (slot.bypassed) effect.setBypassed(true);
-          }
-          syncChain();
+        if (targetRack.cabinetIrId) {
+          await restoreCabinetIrSelection(targetRack.cabinetIrId, targetRack.cabinetIrEnabled);
+        } else {
+          clearCabinetIrSelection(false);
         }
+        applyRackState(targetRack);
       }
 
-      engineRef.current.setPadsThroughChain(padsThroughChain);
       syncLooper();
-      setMetronomeBpmState(engineRef.current.getMetronomeBpm());
-      setMetronomeRunning(engineRef.current.isMetronomeRunning());
+      setCabinetIrName(engineRef.current.getCabinetIrName());
+      setCabinetIrEnabledState(engineRef.current.isCabinetIrEnabled());
+      setCabinetIrMixState(engineRef.current.getCabinetIrMix());
     },
-    [syncChain, syncLooper, padsThroughChain]
+    [applyRackState, applyRigSnapshot, clearCabinetIrSelection, restoreCabinetIrSelection, syncLooper]
   );
 
   const stop = useCallback(() => {
@@ -82,6 +301,8 @@ export function useAudioEngine() {
     setLooperStatus('idle');
     setLooperDuration(0);
     setMetronomeRunning(false);
+    setCabinetIrEnabledState(sessionRackRef.current.cabinetIrEnabled);
+    setCabinetIrName(sessionRackRef.current.cabinetIrName);
   }, []);
 
   const resumeAudioContext = useCallback(async () => {
@@ -107,10 +328,31 @@ export function useAudioEngine() {
 
   const reorderEffects = useCallback(
     (fromIndex: number, toIndex: number) => {
-      engineRef.current.reorderEffects(fromIndex, toIndex);
+      const currentChain = engineRef.current.getChainState();
+      const ids = currentChain.map((slot) => slot.id);
+      const activeId = ids[fromIndex];
+      const overId = ids[toIndex];
+      if (!activeId || !overId) return;
+      const lockedSet = new Set(lockedPedalIds);
+      if (lockedSet.has(activeId) || lockedSet.has(overId)) return;
+
+      const unlockedIds = ids.filter((id) => !lockedSet.has(id));
+      const unlockedFrom = unlockedIds.indexOf(activeId);
+      const unlockedTo = unlockedIds.indexOf(overId);
+      if (unlockedFrom === -1 || unlockedTo === -1) return;
+
+      const [moved] = unlockedIds.splice(unlockedFrom, 1);
+      unlockedIds.splice(unlockedTo, 0, moved);
+
+      let unlockedCursor = 0;
+      const nextOrder = ids.map((id) =>
+        lockedSet.has(id) ? id : unlockedIds[unlockedCursor++]!
+      );
+
+      engineRef.current.setEffectOrder(nextOrder);
       syncChain();
     },
-    [syncChain]
+    [lockedPedalIds, syncChain]
   );
 
   const setEffectParam = useCallback(
@@ -138,7 +380,42 @@ export function useAudioEngine() {
   const setMasterVolume = useCallback((value: number) => {
     engineRef.current.setMasterVolume(value);
     setMasterVolumeState(value);
-  }, []);
+    updateSessionRack({ masterVolume: value });
+  }, [updateSessionRack]);
+
+  const setInputTrim = useCallback((value: number) => {
+    engineRef.current.setInputTrim(value);
+    setInputTrimState(value);
+    updateSessionRack({ inputTrim: value });
+  }, [updateSessionRack]);
+
+  const setMuted = useCallback((value: boolean) => {
+    engineRef.current.setMuted(value);
+    const nextMuted = engineRef.current.isMuted();
+    setMutedState(nextMuted);
+    updateSessionRack({ muted: nextMuted });
+  }, [updateSessionRack]);
+
+  const setAmpChannel = useCallback((value: RackState['ampChannel']) => {
+    engineRef.current.setAmpChannel(value);
+    const nextValue = engineRef.current.getAmpChannel();
+    setAmpChannelState(nextValue);
+    updateSessionRack({ ampChannel: nextValue });
+  }, [updateSessionRack]);
+
+  const setAmpPresence = useCallback((value: number) => {
+    engineRef.current.setAmpPresence(value);
+    const nextValue = engineRef.current.getAmpPresence();
+    setAmpPresenceState(nextValue);
+    updateSessionRack({ ampPresence: nextValue });
+  }, [updateSessionRack]);
+
+  const setAmpLevel = useCallback((value: number) => {
+    engineRef.current.setAmpLevel(value);
+    const nextValue = engineRef.current.getAmpLevel();
+    setAmpLevelState(nextValue);
+    updateSessionRack({ ampLevel: nextValue });
+  }, [updateSessionRack]);
 
   const loadPresetChain = useCallback(
     (slots: PresetEffectSlot[]) => {
@@ -152,6 +429,10 @@ export function useAudioEngine() {
     [syncChain]
   );
 
+  const loadRigSnapshot = useCallback((snapshot: RigSnapshot) => {
+    return applyRigSnapshot(snapshot);
+  }, [applyRigSnapshot]);
+
   const switchInput = useCallback(async (deviceId: string) => {
     await engineRef.current.switchInput(deviceId);
   }, []);
@@ -159,6 +440,52 @@ export function useAudioEngine() {
   const switchOutput = useCallback(async (sinkId: string) => {
     await engineRef.current.setOutputDevice(sinkId);
   }, []);
+
+  const duplicateEffect = useCallback((id: string) => {
+    const effect = engineRef.current.getEffectById(id);
+    if (!effect) return;
+    const duplicate = engineRef.current.addEffect(effect.type, effect.getParams());
+    duplicate.setBypassed(effect.isBypassed());
+    syncChain();
+  }, [syncChain]);
+
+  const copyEffectSettings = useCallback((id: string) => {
+    const effect = engineRef.current.getEffectById(id);
+    if (!effect) return;
+    copiedPedalRef.current = {
+      type: effect.type,
+      bypassed: effect.isBypassed(),
+      params: effect.getParams(),
+    };
+  }, []);
+
+  const pasteEffectSettings = useCallback((id: string) => {
+    const copied = copiedPedalRef.current;
+    if (!copied) return false;
+    const effect = engineRef.current.getEffectById(id);
+    if (!effect || effect.type !== copied.type) return false;
+    for (const [param, value] of Object.entries(copied.params)) {
+      effect.setParam(param, value);
+    }
+    effect.setBypassed(copied.bypassed);
+    syncChain();
+    return true;
+  }, [syncChain]);
+
+  const hasCopiedEffectSettings = useCallback((type?: EffectType) => {
+    if (!copiedPedalRef.current) return false;
+    return type ? copiedPedalRef.current.type === type : true;
+  }, []);
+
+  const toggleLockedEffect = useCallback((id: string) => {
+    setLockedPedalIds((current) =>
+      current.includes(id) ? current.filter((entry) => entry !== id) : [...current, id]
+    );
+  }, []);
+
+  const isEffectLocked = useCallback((id: string) => {
+    return lockedPedalIds.includes(id);
+  }, [lockedPedalIds]);
 
   const looperStartRecord = useCallback(() => {
     engineRef.current.startLooperRecord();
@@ -185,36 +512,40 @@ export function useAudioEngine() {
     syncLooper();
   }, [syncLooper]);
 
-  const setLooperLevel = useCallback(
-    (v: number) => {
-      engineRef.current.setLooperLevel(v);
-    },
-    []
-  );
+  const setLooperLevel = useCallback((v: number) => {
+    engineRef.current.setLooperLevel(v);
+  }, []);
 
   const metronomeStart = useCallback(() => {
     engineRef.current.metronomeStart();
-    setMetronomeRunning(engineRef.current.isMetronomeRunning());
-  }, []);
+    const running = engineRef.current.isMetronomeRunning();
+    setMetronomeRunning(running);
+    updateSessionRack({ metronomeRunning: running });
+  }, [updateSessionRack]);
 
   const metronomeStop = useCallback(() => {
     engineRef.current.metronomeStop();
     setMetronomeRunning(false);
-  }, []);
+    updateSessionRack({ metronomeRunning: false });
+  }, [updateSessionRack]);
 
   const setMetronomeBpm = useCallback((bpm: number) => {
     engineRef.current.setMetronomeBpm(bpm);
-    setMetronomeBpmState(engineRef.current.getMetronomeBpm());
-  }, []);
+    const nextBpm = engineRef.current.getMetronomeBpm();
+    setMetronomeBpmState(nextBpm);
+    updateSessionRack({ metronomeBpm: nextBpm });
+  }, [updateSessionRack]);
 
   const applyTapTempoToEffects = useCallback(
     (bpm: number) => {
       engineRef.current.setMetronomeBpm(bpm);
       engineRef.current.applyBpmToTimeEffects(bpm);
-      setMetronomeBpmState(engineRef.current.getMetronomeBpm());
+      const nextBpm = engineRef.current.getMetronomeBpm();
+      setMetronomeBpmState(nextBpm);
+      updateSessionRack({ metronomeBpm: nextBpm });
       syncChain();
     },
-    [syncChain]
+    [syncChain, updateSessionRack]
   );
 
   const playDrumPad = useCallback((index: number, velocity?: number) => {
@@ -224,36 +555,247 @@ export function useAudioEngine() {
   const setPadsThroughChain = useCallback((through: boolean) => {
     engineRef.current.setPadsThroughChain(through);
     setPadsThroughChainState(through);
-  }, []);
+    updateSessionRack({ padsThroughChain: through });
+  }, [updateSessionRack]);
+
+  const setGlobalNoiseGateEnabled = useCallback((enabled: boolean) => {
+    engineRef.current.setGlobalNoiseGateEnabled(enabled);
+    const nextEnabled = engineRef.current.isGlobalNoiseGateEnabled();
+    setGlobalNoiseGateEnabledState(nextEnabled);
+    updateSessionRack({ globalNoiseGateEnabled: nextEnabled });
+  }, [updateSessionRack]);
+
+  const setGlobalNoiseGateThreshold = useCallback((value: number) => {
+    engineRef.current.setGlobalNoiseGateThreshold(value);
+    const nextValue = engineRef.current.getGlobalNoiseGateThreshold();
+    setGlobalNoiseGateThresholdState(nextValue);
+    updateSessionRack({ globalNoiseGateThreshold: nextValue });
+  }, [updateSessionRack]);
+
+  const setGlobalNoiseGateRelease = useCallback((value: number) => {
+    engineRef.current.setGlobalNoiseGateRelease(value);
+    const nextValue = engineRef.current.getGlobalNoiseGateRelease();
+    setGlobalNoiseGateReleaseState(nextValue);
+    updateSessionRack({ globalNoiseGateRelease: nextValue });
+  }, [updateSessionRack]);
+
+  const setGlobalNoiseGateReduction = useCallback((value: number) => {
+    engineRef.current.setGlobalNoiseGateReduction(value);
+    const nextValue = engineRef.current.getGlobalNoiseGateReduction();
+    setGlobalNoiseGateReductionState(nextValue);
+    updateSessionRack({ globalNoiseGateReduction: nextValue });
+  }, [updateSessionRack]);
 
   const captureMicToPad = useCallback(async (padIndex: number) => {
     return engineRef.current.captureMicToPad(padIndex, 1000);
   }, []);
 
+  const loadCabinetIr = useCallback(async (file: File) => {
+    setCabinetIrLibraryBusy(true);
+    try {
+      const data = await file.arrayBuffer();
+      const stored = await saveCabinetIr({
+        name: file.name.replace(/\.[^.]+$/, '') || file.name,
+        fileName: file.name,
+        mimeType: file.type || 'application/octet-stream',
+        data,
+      });
+      await refreshCabinetIrLibrary();
+      if (engineRef.current.isRunning()) {
+        const loaded = await engineRef.current.loadCabinetIrBuffer(data, stored.name);
+        if (!loaded) return false;
+      }
+
+      setCabinetIrActiveId(stored.id);
+      setCabinetIrName(stored.name);
+      setCabinetIrEnabledState(engineRef.current.isRunning() ? engineRef.current.isCabinetIrEnabled() : true);
+      setCabinetIrMixState(engineRef.current.getCabinetIrMix());
+      updateSessionRack({
+        cabinetIrId: stored.id,
+        cabinetIrName: stored.name,
+        cabinetIrEnabled: engineRef.current.isRunning() ? engineRef.current.isCabinetIrEnabled() : true,
+        cabinetIrMix: engineRef.current.getCabinetIrMix(),
+      });
+      return true;
+    } finally {
+      setCabinetIrLibraryBusy(false);
+    }
+  }, [refreshCabinetIrLibrary, updateSessionRack]);
+
+  const selectCabinetIr = useCallback(async (id: string) => {
+    setCabinetIrLibraryBusy(true);
+    try {
+      const restored = await restoreCabinetIrSelection(id, true);
+      return Boolean(restored);
+    } finally {
+      setCabinetIrLibraryBusy(false);
+    }
+  }, [restoreCabinetIrSelection]);
+
+  const clearCabinetIr = useCallback(() => {
+    clearCabinetIrSelection(false);
+  }, [clearCabinetIrSelection]);
+
+  const setCabinetIrEnabled = useCallback((enabled: boolean) => {
+    engineRef.current.setCabinetIrEnabled(enabled);
+    const nextEnabled = engineRef.current.isCabinetIrEnabled();
+    setCabinetIrEnabledState(nextEnabled);
+    updateSessionRack({ cabinetIrEnabled: nextEnabled });
+  }, [updateSessionRack]);
+
+  const setCabinetIrMix = useCallback((mix: number) => {
+    engineRef.current.setCabinetIrMix(mix);
+    const nextMix = engineRef.current.getCabinetIrMix();
+    setCabinetIrMixState(nextMix);
+    updateSessionRack({ cabinetIrMix: nextMix });
+  }, [updateSessionRack]);
+
+  const startOutputRecording = useCallback(() => {
+    const started = engineRef.current.startOutputRecording();
+    if (started) {
+      outputRecordingStartedAtRef.current = performance.now();
+      setOutputRecorderActive(true);
+      setOutputRecorderDuration(0);
+    }
+    return started;
+  }, []);
+
+  const stopOutputRecording = useCallback(async () => {
+    const blob = await engineRef.current.stopOutputRecording();
+    outputRecordingStartedAtRef.current = null;
+    setOutputRecorderActive(false);
+    setOutputRecorderDuration(0);
+    if (!blob) return null;
+    if (lastRecordingUrl) URL.revokeObjectURL(lastRecordingUrl);
+    const url = URL.createObjectURL(blob);
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    setLastRecordingUrl(url);
+    setLastRecordingName(`wamp-output-${stamp}.webm`);
+    return { url, blob };
+  }, [lastRecordingUrl]);
+
+  const renameCabinetIrEntry = useCallback(async (id: string, name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return false;
+    setCabinetIrLibraryBusy(true);
+    try {
+      const updated = await renameCabinetIr(id, trimmed);
+      await refreshCabinetIrLibrary();
+      if (!updated) return false;
+      if (cabinetIrActiveId === id) {
+        setCabinetIrName(updated.name);
+        updateSessionRack({ cabinetIrName: updated.name });
+      }
+      return true;
+    } finally {
+      setCabinetIrLibraryBusy(false);
+    }
+  }, [cabinetIrActiveId, refreshCabinetIrLibrary, updateSessionRack]);
+
+  const deleteCabinetIrEntry = useCallback(async (id: string) => {
+    setCabinetIrLibraryBusy(true);
+    try {
+      await deleteCabinetIr(id);
+      if (cabinetIrActiveId === id) {
+        clearCabinetIrSelection(false);
+      }
+      await refreshCabinetIrLibrary();
+    } finally {
+      setCabinetIrLibraryBusy(false);
+    }
+  }, [cabinetIrActiveId, clearCabinetIrSelection, refreshCabinetIrLibrary]);
+
   useEffect(() => {
     if (!isRunning) return;
     let raf: number;
     const tick = () => {
+      const now = performance.now();
+      if (lastFrameTimeRef.current !== null) {
+        const frameMs = now - lastFrameTimeRef.current;
+        averageFrameMsRef.current = averageFrameMsRef.current === 0
+          ? frameMs
+          : averageFrameMsRef.current * 0.9 + frameMs * 0.1;
+      }
+      lastFrameTimeRef.current = now;
       setInputLevel(engineRef.current.getInputLevel());
       setOutputLevel(engineRef.current.getOutputLevel());
+      setOutputPeak(engineRef.current.getOutputPeak());
+      const pitch = engineRef.current.getInputPitchAnalysis();
+      updateTunerSnapshot(pitch.frequency, pitch.clarity, pitch.signal);
+      if (outputRecordingStartedAtRef.current !== null) {
+        setOutputRecorderDuration((now - outputRecordingStartedAtRef.current) / 1000);
+      }
+      const baseLatencyMs = engineRef.current.getBaseLatencyMs();
+      const outputLatencyMs = engineRef.current.getOutputLatencyMs();
+      const activeNodes = engineRef.current.getActiveNodeEstimate();
+      const averageFrameMs = averageFrameMsRef.current;
+      const estimatedCpuLoad = Math.min(
+        99,
+        Math.max(
+          0,
+          activeNodes * 3
+            + (baseLatencyMs + outputLatencyMs) * 0.35
+            + averageFrameMs * 1.8
+            + (outputRecorderActive ? 10 : 0)
+            + (metronomeRunning ? 3 : 0)
+        )
+      );
+      setPerformanceSnapshot({
+        baseLatencyMs,
+        outputLatencyMs,
+        sampleRate: engineRef.current.getSampleRate(),
+        activeNodes,
+        averageFrameMs,
+        estimatedCpuLoad,
+      });
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [isRunning]);
+  }, [isRunning, metronomeRunning, outputRecorderActive, updateTunerSnapshot]);
+
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      if (lastRecordingUrl) URL.revokeObjectURL(lastRecordingUrl);
+    };
+  }, [lastRecordingUrl]);
 
   return {
     isRunning,
     chain,
+    lockedPedalIds,
     masterVolume,
+    inputTrim,
+    muted,
+    ampChannel,
+    ampPresence,
+    ampLevel,
     inputLevel,
     outputLevel,
+    outputPeak,
+    tuner,
     contextState,
     looperStatus,
     looperDuration,
     metronomeBpm,
     metronomeRunning,
     padsThroughChain,
+    globalNoiseGateEnabled,
+    globalNoiseGateThreshold,
+    globalNoiseGateRelease,
+    globalNoiseGateReduction,
+    cabinetIrLibrary,
+    cabinetIrLibraryBusy,
+    cabinetIrActiveId,
+    cabinetIrName,
+    cabinetIrEnabled,
+    cabinetIrMix,
+    outputRecorderActive,
+    outputRecorderDuration,
+    lastRecordingUrl,
+    lastRecordingName,
+    performanceSnapshot,
     start,
     stop,
     resumeAudioContext,
@@ -262,11 +804,24 @@ export function useAudioEngine() {
     reorderEffects,
     setEffectParam,
     toggleBypass,
+    duplicateEffect,
+    copyEffectSettings,
+    pasteEffectSettings,
+    hasCopiedEffectSettings,
+    toggleLockedEffect,
+    isEffectLocked,
     setMasterVolume,
+    setInputTrim,
+    setMuted,
+    setAmpChannel,
+    setAmpPresence,
+    setAmpLevel,
     loadPresetChain,
+    loadRigSnapshot,
     switchInput,
     switchOutput,
     getChainState: () => engineRef.current.getChainState(),
+    getRackState,
     looperStartRecord,
     looperStopRecord,
     looperPlay,
@@ -279,7 +834,20 @@ export function useAudioEngine() {
     applyTapTempoToEffects,
     playDrumPad,
     setPadsThroughChain,
+    setGlobalNoiseGateEnabled,
+    setGlobalNoiseGateThreshold,
+    setGlobalNoiseGateRelease,
+    setGlobalNoiseGateReduction,
     captureMicToPad,
+    loadCabinetIr,
+    selectCabinetIr,
+    renameCabinetIrEntry,
+    deleteCabinetIrEntry,
+    clearCabinetIr,
+    setCabinetIrEnabled,
+    setCabinetIrMix,
+    startOutputRecording,
+    stopOutputRecording,
   };
 }
 

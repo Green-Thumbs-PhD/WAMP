@@ -1,4 +1,5 @@
 import type { EffectType } from './effects';
+import type { RackState } from './rack';
 
 export interface PresetEffectSlot {
   type: EffectType;
@@ -6,9 +7,18 @@ export interface PresetEffectSlot {
   params: Record<string, number>;
 }
 
+export interface RigSnapshot {
+  chain: PresetEffectSlot[];
+  rack: RackState;
+}
+
 export interface Preset {
   id: string;
   name: string;
   isFactory: boolean;
-  chain: PresetEffectSlot[];
+  chain: RigSnapshot['chain'];
+  rack: RigSnapshot['rack'];
+  category: string;
+  tags: string[];
+  favorite: boolean;
 }

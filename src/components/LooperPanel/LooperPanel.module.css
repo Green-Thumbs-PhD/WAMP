@@ -3,17 +3,22 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem 0.75rem;
-  padding: 0.65rem 1rem;
-  background: #1a1a1a;
-  border: 1px solid #333;
-  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 20%),
+    linear-gradient(180deg, #24262a, #111316 65%, #0d0f11);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.55);
 }
 
 .title {
   font-size: 0.7rem;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: #888;
+  letter-spacing: 0.14em;
+  color: #d0a95d;
   width: 100%;
   margin: 0 0 0.15rem 0;
 }
@@ -22,15 +27,15 @@
   font: inherit;
   font-size: 0.8rem;
   padding: 0.35rem 0.65rem;
-  border-radius: 6px;
-  border: 1px solid #444;
-  background: #2a2a2a;
+  border-radius: 999px;
+  border: 1px solid #4b4d52;
+  background: linear-gradient(180deg, #34373c, #1c1e22);
   color: #ddd;
   cursor: pointer;
 }
 
 .btn:hover:not(:disabled) {
-  background: #333;
+  background: linear-gradient(180deg, #41454b, #22252a);
 }
 
 .btn:disabled {
@@ -55,7 +60,7 @@
 
 .meta {
   font-size: 0.75rem;
-  color: #777;
+  color: #8e949c;
 }
 
 .level {
@@ -63,7 +68,7 @@
   align-items: center;
   gap: 0.35rem;
   font-size: 0.75rem;
-  color: #999;
+  color: #b2b7bd;
 }
 
 .level input {

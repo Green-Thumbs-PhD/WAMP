@@ -8,7 +8,7 @@
 
 .valueDisplay {
   font-size: 9px;
-  color: #ccc;
+  color: var(--theme-card-text);
   text-align: center;
   height: 14px;
   line-height: 14px;
@@ -18,7 +18,7 @@
 
 .unit {
   font-size: 7px;
-  color: #888;
+  color: var(--theme-card-muted);
   margin-left: 1px;
 }
 
@@ -41,14 +41,14 @@
 .knobBody {
   fill: url(#knobGradient);
   fill: #2a2a2a;
-  stroke: #555;
+  stroke: color-mix(in srgb, var(--theme-card-border) 70%, #555);
   stroke-width: 1;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
 }
 
 .label {
   font-size: 9px;
-  color: #aaa;
+  color: var(--theme-card-muted);
   text-transform: uppercase;
   letter-spacing: 1px;
   text-align: center;

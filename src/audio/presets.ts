@@ -1,7 +1,5 @@
-import type { Preset, PresetEffectSlot } from '../types/presets';
-
-const STORAGE_KEY_PRESETS = 'mac2-presets';
-const STORAGE_KEY_STATE = 'mac2-last-state';
+import type { Preset } from '../types/presets';
+import { createDefaultRackState } from '../types/rack';
 
 export const FACTORY_PRESETS: Preset[] = [
   {
@@ -13,6 +11,10 @@ export const FACTORY_PRESETS: Preset[] = [
       { type: 'eq', bypassed: false, params: { lowGain: 0, midGain: -2, midFreq: 1000, highGain: 2 } },
       { type: 'volume', bypassed: false, params: { gain: 100 } },
     ],
+    rack: createDefaultRackState(),
+    category: 'Clean',
+    tags: ['factory', 'clean', 'studio'],
+    favorite: false,
   },
   {
     id: 'factory-crunch',
@@ -25,6 +27,10 @@ export const FACTORY_PRESETS: Preset[] = [
       { type: 'delay', bypassed: false, params: { time: 120, feedback: 15, mix: 20 } },
       { type: 'volume', bypassed: false, params: { gain: 100 } },
     ],
+    rack: createDefaultRackState(),
+    category: 'Crunch',
+    tags: ['factory', 'crunch', 'rock'],
+    favorite: false,
   },
   {
     id: 'factory-lead',
@@ -38,6 +44,10 @@ export const FACTORY_PRESETS: Preset[] = [
       { type: 'reverb', bypassed: false, params: { decay: 1.5, mix: 20, brightness: 60 } },
       { type: 'volume', bypassed: false, params: { gain: 100 } },
     ],
+    rack: createDefaultRackState(),
+    category: 'Lead',
+    tags: ['factory', 'lead', 'solo'],
+    favorite: false,
   },
   {
     id: 'factory-ambient',
@@ -51,6 +61,10 @@ export const FACTORY_PRESETS: Preset[] = [
       { type: 'tremolo', bypassed: false, params: { rate: 1.5, depth: 25, wave: 0 } },
       { type: 'volume', bypassed: false, params: { gain: 100 } },
     ],
+    rack: createDefaultRackState(),
+    category: 'Ambient',
+    tags: ['factory', 'ambient', 'space'],
+    favorite: false,
   },
   {
     id: 'factory-heavy',
@@ -62,6 +76,10 @@ export const FACTORY_PRESETS: Preset[] = [
       { type: 'eq', bypassed: false, params: { lowGain: 3, midGain: -4, midFreq: 600, highGain: 2 } },
       { type: 'volume', bypassed: false, params: { gain: 100 } },
     ],
+    rack: createDefaultRackState(),
+    category: 'Heavy',
+    tags: ['factory', 'heavy', 'gain'],
+    favorite: false,
   },
   {
     id: 'factory-surf',
@@ -72,33 +90,9 @@ export const FACTORY_PRESETS: Preset[] = [
       { type: 'reverb', bypassed: false, params: { decay: 1.8, mix: 45, brightness: 70 } },
       { type: 'volume', bypassed: false, params: { gain: 100 } },
     ],
+    rack: createDefaultRackState(),
+    category: 'Vintage',
+    tags: ['factory', 'surf', 'spring'],
+    favorite: false,
   },
 ];
-
-export function loadUserPresets(): Preset[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY_PRESETS);
-    if (!raw) return [];
-    return JSON.parse(raw) as Preset[];
-  } catch {
-    return [];
-  }
-}
-
-export function saveUserPresets(presets: Preset[]): void {
-  localStorage.setItem(STORAGE_KEY_PRESETS, JSON.stringify(presets));
-}
-
-export function loadLastState(): PresetEffectSlot[] | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY_STATE);
-    if (!raw) return null;
-    return JSON.parse(raw) as PresetEffectSlot[];
-  } catch {
-    return null;
-  }
-}
-
-export function saveLastState(chain: PresetEffectSlot[]): void {
-  localStorage.setItem(STORAGE_KEY_STATE, JSON.stringify(chain));
-}

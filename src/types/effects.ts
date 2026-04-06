@@ -3,10 +3,22 @@ export type EffectType =
   | 'delay'
   | 'reverb'
   | 'chorus'
+  | 'flanger'
   | 'tremolo'
   | 'eq'
+  | 'graphicEq'
   | 'compressor'
-  | 'volume';
+  | 'limiter'
+  | 'volume'
+  | 'noiseGate'
+  | 'preamp'
+  | 'phaser'
+  | 'octaver'
+  | 'autoWah'
+  | 'cabSim'
+  | 'pitchShifter'
+  | 'harmonizer'
+  | 'freeze';
 
 export interface ParamDescriptor {
   name: string;

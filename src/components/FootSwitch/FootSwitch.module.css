@@ -2,8 +2,8 @@
   width: 42px;
   height: 42px;
   border-radius: 50%;
-  border: 2px solid #444;
-  background: linear-gradient(145deg, #3a3a3a, #1a1a1a);
+  border: 2px solid color-mix(in srgb, var(--theme-card-border) 70%, #444);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--theme-card-active) 14%, #3a3a3a), #1a1a1a);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -27,6 +27,6 @@
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: radial-gradient(circle at 40% 35%, #555, #2a2a2a);
-  border: 1px solid #333;
+  background: radial-gradient(circle at 40% 35%, color-mix(in srgb, var(--theme-card-muted) 50%, #555), #2a2a2a);
+  border: 1px solid color-mix(in srgb, var(--theme-card-border) 70%, #333);
 }
