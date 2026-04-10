@@ -1,5 +1,7 @@
 ![WAMP_logo](https://github.com/user-attachments/assets/5dec99b4-ed9e-4a9e-a74f-f9cbbb29ee12)
+<p align="center" width="100%">
 <iframe width="560" height="315" src="[https://www.youtube.com/embed/video-id](https://youtu.be/yHcFO6to8E8)" frameborder="0" allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+</p>
 
 WAMP is a browser-based guitar and audio practice rig built with React, TypeScript, and the Web Audio API. It combines a pedalboard, rack utilities, preset workflow, cabinet IR management, MIDI mapping, drum pads, metronome, tuner, looper controls, amp voicing, output recording, and a hideable CPU monitor in one browser app.
 
