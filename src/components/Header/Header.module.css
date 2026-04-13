@@ -1,8 +1,8 @@
 .header {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 18px 20px;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 24px 20px 20px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.02) 18%, transparent 18%),
     var(--theme-slot-bg);
   border: 1px solid var(--theme-slot-border);
@@ -11,8 +11,26 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.16),
     inset 0 -1px 0 rgba(0, 0, 0, 0.6),
     0 8px 22px rgba(0, 0, 0, 0.28);
-  gap: 16px;
-  min-height: 84px;
+  gap: 22px;
+  min-height: 0;
+}
+
+.brandRow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 14px;
+  width: 100%;
+  text-align: center;
+}
+
+.controlsRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  width: 100%;
 }
 
 .left {
@@ -34,11 +52,11 @@
 }
 
 .logo {
-  font-size: 28px;
+  font-size: 56px;
   font-weight: 800;
   color: var(--theme-card-text);
   font-family: var(--theme-font-display);
-  letter-spacing: 4px;
+  letter-spacing: 8px;
   text-transform: uppercase;
   margin: 0;
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
@@ -52,13 +70,13 @@
 .powerBtn {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
+  gap: 12px;
+  padding: 16px 30px;
   border-radius: 999px;
   border: 1px solid var(--theme-slot-border);
-  font-size: 11px;
+  font-size: 22px;
   font-weight: 700;
-  letter-spacing: 1.5px;
+  letter-spacing: 2.5px;
   cursor: pointer;
   transition: all 0.15s ease;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
@@ -85,8 +103,8 @@
 }
 
 .powerDot {
-  width: 8px;
-  height: 8px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   display: inline-block;
 }
@@ -170,13 +188,39 @@
 }
 
 @media (max-width: 960px) {
-  .header {
-    flex-wrap: wrap;
+  .controlsRow {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .right {
     justify-content: center;
+    margin-left: 0;
   }
 }
 
 @media (max-width: 640px) {
+  .header {
+    padding: 20px 14px 16px;
+    gap: 18px;
+  }
+
+  .logo {
+    font-size: 40px;
+    letter-spacing: 5px;
+  }
+
+  .powerBtn {
+    padding: 12px 22px;
+    font-size: 16px;
+    gap: 10px;
+  }
+
+  .powerDot {
+    width: 12px;
+    height: 12px;
+  }
+
   .left {
     flex-direction: column;
     align-items: stretch;

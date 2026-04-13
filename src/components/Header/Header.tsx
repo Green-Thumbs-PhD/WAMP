@@ -168,7 +168,7 @@ export function Header({
 
   return (
     <header className={styles.header}>
-      <div className={styles.left}>
+      <div className={styles.brandRow}>
         <h1 className={styles.logo}>WAMP</h1>
         <div className={styles.powerSection}>
           {isRunning ? (
@@ -181,6 +181,10 @@ export function Header({
             </button>
           )}
         </div>
+      </div>
+
+      <div className={styles.controlsRow}>
+        <div className={styles.left}>
         <div className={styles.ioStack}>
           <InputSelector onSelect={onInputSelect} disabled={false} />
           <OutputSelector onSelect={onOutputSelect} disabled={false} />
@@ -210,65 +214,66 @@ export function Header({
             onRecallCompare={onRecallCompare}
           />
         </div>
-      </div>
+        </div>
 
-      <div className={styles.right}>
-        {isRunning && (
-          <>
-            <LevelMeter level={inputLevel} label="IN" />
-            <LevelMeter level={outputLevel} label="OUT" color="#4da6e0" />
-            <Knob
-              descriptor={inputTrimDescriptor}
-              value={inputTrim * 100}
-              onChange={(v) => setInputTrim(v / 100)}
-              color="#8fd3ff"
-              size={44}
-              ariaLabel="Input trim"
-            />
-            <Knob
-              descriptor={masterVolumeDescriptor}
-              value={masterVolume * 100}
-              onChange={(v) => setMasterVolume(v / 100)}
-              color="#e0c44d"
-              size={44}
-              ariaLabel="Master output level"
-            />
-            <button
-              type="button"
-              className={`${styles.utilityBtn} ${muted ? styles.utilityBtnActive : ''}`}
-              onClick={() => setMuted(!muted)}
-            >
-              {muted ? 'Muted' : 'Mute'}
-            </button>
-            <div className={styles.compareSection}>
-              <div className={styles.compareLabel}>Preset A/B</div>
-              <div className={styles.compareButtons}>
-                <button type="button" className={styles.compareStore} onClick={() => onCaptureCompare('A')}>
-                  Store A
-                </button>
-                <button
-                  type="button"
-                  className={`${styles.compareToggle} ${compareSlots.active === 'A' ? styles.compareToggleActive : ''}`}
-                  onClick={() => onRecallCompare('A')}
-                  disabled={!compareSlots.A}
-                >
-                  A
-                </button>
-                <button type="button" className={styles.compareStore} onClick={() => onCaptureCompare('B')}>
-                  Store B
-                </button>
-                <button
-                  type="button"
-                  className={`${styles.compareToggle} ${compareSlots.active === 'B' ? styles.compareToggleActive : ''}`}
-                  onClick={() => onRecallCompare('B')}
-                  disabled={!compareSlots.B}
-                >
-                  B
-                </button>
+        <div className={styles.right}>
+          {isRunning && (
+            <>
+              <LevelMeter level={inputLevel} label="IN" />
+              <LevelMeter level={outputLevel} label="OUT" color="#4da6e0" />
+              <Knob
+                descriptor={inputTrimDescriptor}
+                value={inputTrim * 100}
+                onChange={(v) => setInputTrim(v / 100)}
+                color="#8fd3ff"
+                size={44}
+                ariaLabel="Input trim"
+              />
+              <Knob
+                descriptor={masterVolumeDescriptor}
+                value={masterVolume * 100}
+                onChange={(v) => setMasterVolume(v / 100)}
+                color="#e0c44d"
+                size={44}
+                ariaLabel="Master output level"
+              />
+              <button
+                type="button"
+                className={`${styles.utilityBtn} ${muted ? styles.utilityBtnActive : ''}`}
+                onClick={() => setMuted(!muted)}
+              >
+                {muted ? 'Muted' : 'Mute'}
+              </button>
+              <div className={styles.compareSection}>
+                <div className={styles.compareLabel}>Preset A/B</div>
+                <div className={styles.compareButtons}>
+                  <button type="button" className={styles.compareStore} onClick={() => onCaptureCompare('A')}>
+                    Store A
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.compareToggle} ${compareSlots.active === 'A' ? styles.compareToggleActive : ''}`}
+                    onClick={() => onRecallCompare('A')}
+                    disabled={!compareSlots.A}
+                  >
+                    A
+                  </button>
+                  <button type="button" className={styles.compareStore} onClick={() => onCaptureCompare('B')}>
+                    Store B
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.compareToggle} ${compareSlots.active === 'B' ? styles.compareToggleActive : ''}`}
+                    onClick={() => onRecallCompare('B')}
+                    disabled={!compareSlots.B}
+                  >
+                    B
+                  </button>
+                </div>
               </div>
-            </div>
-          </>
-        )}
+            </>
+          )}
+        </div>
       </div>
     </header>
   );

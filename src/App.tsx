@@ -114,6 +114,14 @@ function App() {
           <section className="rack-shell" aria-label="Stereo rack amplifier system">
             <div className="rack-rail rack-rail-left" aria-hidden="true" />
             <div className="rack-body">
+              <Header
+                onStart={runStart}
+                onInputSelect={handleInputSelect}
+                onOutputSelect={handleOutputSelect}
+                compareSlots={compareSlots}
+                onCaptureCompare={handleCaptureCompare}
+                onRecallCompare={handleRecallCompare}
+              />
               <p className="app-hint">
                 <span className="app-hint-theme">{activeTheme.name}</span>
                 Effects run left to right. Presets save the whole chain. Space starts or stops audio when you are not typing in a field.
@@ -154,14 +162,6 @@ function App() {
                   ))}
                 </div>
               </section>
-              <Header
-                onStart={runStart}
-                onInputSelect={handleInputSelect}
-                onOutputSelect={handleOutputSelect}
-                compareSlots={compareSlots}
-                onCaptureCompare={handleCaptureCompare}
-                onRecallCompare={handleRecallCompare}
-              />
               <div className="tool-dock">
                 {RACK_TOOL_REGISTRY.filter((tool) => isRackToolEnabled(tool.featureFlag)).map((tool) => {
                   const ToolComponent = tool.component;

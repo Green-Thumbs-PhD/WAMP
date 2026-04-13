@@ -1,4 +1,4 @@
-export type AppThemeId = 'the-stack' | 'cyberpunk' | 'sunset-static' | 'polar-signal';
+export type AppThemeId = 'the-stack' | 'cyberpunk' | 'ghetto-blaster' | 'polar-signal';
 
 export interface AppThemeDefinition {
   id: AppThemeId;
@@ -26,11 +26,11 @@ export const APP_THEME_REGISTRY: readonly AppThemeDefinition[] = [
     preview: ['#00f6ff', '#ff2db9', '#1c1035'],
   },
   {
-    id: 'sunset-static',
-    name: 'Sunset Static',
-    description: 'Dusty motel gradients with tape heat and amber haze.',
-    badges: ['Tape Echo Lane', 'Sunline Console', 'Palm Drive Recall'],
-    preview: ['#ffb44d', '#ff5f6d', '#3a2158'],
+    id: 'ghetto-blaster',
+    name: 'Ghetto Blaster',
+    description: 'Chunky tape-deck chrome, speaker grills, and street-lit cassette swagger.',
+    badges: ['Dual Cassette Deck', 'Chrome Speaker Array', 'Street Tape Recall'],
+    preview: ['#d7d9df', '#ff7a18', '#191919'],
   },
   {
     id: 'polar-signal',
