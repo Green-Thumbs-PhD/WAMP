@@ -1,4 +1,5 @@
-# WAMP
+[![Watch the Promo](https://img.youtube.com/vi/yHcFO6to8E8/0.jpg)](https://www.youtube.com/watch?v=yHcFO6to8E8)
+
 
 WAMP is a browser-based guitar and audio practice rig built with React, TypeScript, and the Web Audio API. It combines a pedalboard, rack utilities, preset workflow, cabinet IR management, MIDI mapping, drum pads, metronome, tuner, an expanded looper and backing-track practice workstation, amp voicing, output recording, and a hideable CPU monitor in one browser app.
 
@@ -506,3 +507,5 @@ For the best experience, use a modern desktop browser with support for:
 ## Project Note
 
 In this Codex workspace environment, Vite commands may fail inside the sandbox with `spawn EPERM` even when the project itself is valid.
+
+![WAMP_logo](https://github.com/user-attachments/assets/5dec99b4-ed9e-4a9e-a74f-f9cbbb29ee12)
