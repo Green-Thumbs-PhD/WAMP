@@ -14,6 +14,8 @@ export const FACTORY_PRESETS: Preset[] = [
     rack: createDefaultRackState(),
     category: 'Clean',
     tags: ['factory', 'clean', 'studio'],
+    description: 'Balanced clean foundation with light compression and a polished top end.',
+    notes: '',
     favorite: false,
   },
   {
@@ -30,6 +32,8 @@ export const FACTORY_PRESETS: Preset[] = [
     rack: createDefaultRackState(),
     category: 'Crunch',
     tags: ['factory', 'crunch', 'rock'],
+    description: 'Mid-forward breakup with compact ambience for classic rhythm parts.',
+    notes: '',
     favorite: false,
   },
   {
@@ -47,6 +51,8 @@ export const FACTORY_PRESETS: Preset[] = [
     rack: createDefaultRackState(),
     category: 'Lead',
     tags: ['factory', 'lead', 'solo'],
+    description: 'Focused sustain and delay support for melodic lead playing.',
+    notes: '',
     favorite: false,
   },
   {
@@ -64,6 +70,8 @@ export const FACTORY_PRESETS: Preset[] = [
     rack: createDefaultRackState(),
     category: 'Ambient',
     tags: ['factory', 'ambient', 'space'],
+    description: 'Wide modulation and long tails for expansive textures.',
+    notes: '',
     favorite: false,
   },
   {
@@ -79,6 +87,8 @@ export const FACTORY_PRESETS: Preset[] = [
     rack: createDefaultRackState(),
     category: 'Heavy',
     tags: ['factory', 'heavy', 'gain'],
+    description: 'High-gain contour with scooped mids and strong compression.',
+    notes: '',
     favorite: false,
   },
   {
@@ -93,6 +103,8 @@ export const FACTORY_PRESETS: Preset[] = [
     rack: createDefaultRackState(),
     category: 'Vintage',
     tags: ['factory', 'surf', 'spring'],
+    description: 'Bright tremolo and reverb splash for vintage-style rhythm lines.',
+    notes: '',
     favorite: false,
   },
 ];

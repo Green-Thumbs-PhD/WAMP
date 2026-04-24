@@ -84,7 +84,7 @@ export function MetronomeBar() {
 
   return (
     <section className={styles.bar} aria-label="Metronome and tap tempo">
-      <h2 className={styles.title}>Metronome / tuner</h2>
+      <h2 className={styles.title}>METRONOME</h2>
       <div className={styles.section}>
         <div className={styles.sectionHeader}>Tempo</div>
         <div className={styles.controlRow}>
@@ -129,7 +129,7 @@ export function MetronomeBar() {
         </span>
       </div>
       <div className={styles.section}>
-        <div className={styles.sectionHeader}>Tuner</div>
+        <div className={styles.tunerHeader}>TUNER</div>
         <div className={styles.tunerPanel}>
           <div className={styles.tunerNote}>{tunerDisplay.note}</div>
           <div className={styles.tunerMeta}>

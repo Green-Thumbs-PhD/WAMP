@@ -4,31 +4,38 @@ import styles from './InputSelector.module.css';
 interface InputSelectorProps {
   onSelect: (deviceId: string) => void;
   disabled?: boolean;
+  refreshToken?: number;
 }
 
-export function InputSelector({ onSelect, disabled = false }: InputSelectorProps) {
+export function InputSelector({ onSelect, disabled = false, refreshToken = 0 }: InputSelectorProps) {
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [selected, setSelected] = useState('');
 
   useEffect(() => {
+    let active = true;
+
     async function enumerate() {
       const allDevices = await navigator.mediaDevices.enumerateDevices();
+      if (!active) return;
       const audioInputs = allDevices.filter((d) => d.kind === 'audioinput');
       setDevices(audioInputs);
-      if (audioInputs.length > 0 && !selected) {
-        setSelected(audioInputs[0].deviceId);
-      }
+      setSelected((current) => {
+        if (current) return current;
+        return audioInputs[0]?.deviceId ?? '';
+      });
     }
     enumerate();
     navigator.mediaDevices.addEventListener('devicechange', enumerate);
-    return () => navigator.mediaDevices.removeEventListener('devicechange', enumerate);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    return () => {
+      active = false;
+      navigator.mediaDevices.removeEventListener('devicechange', enumerate);
+    };
+  }, [refreshToken]);
 
   useEffect(() => {
-    if (!selected) return;
+    if (!selected || !devices.some((device) => device.deviceId === selected)) return;
     onSelect(selected);
-  }, [selected, onSelect]);
+  }, [devices, selected, onSelect]);
 
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const deviceId = e.target.value;

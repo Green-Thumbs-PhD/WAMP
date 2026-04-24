@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import styles from './MidiMapper.module.css';
 import { loadMidiMappingState, saveMidiMappingState } from '../../storage/midiStorage';
 import type { MidiBinding, MidiMappingState, MidiTargetId } from '../../types/midi';
@@ -61,16 +61,14 @@ export function MidiMapper(props: MidiMapperProps) {
   const midiAccessRef = useRef<MidiAccessWithInputs | null>(null);
   const pressedRef = useRef<Record<string, boolean>>({});
   const latestPropsRef = useRef(props);
-  latestPropsRef.current = props;
+
+  useEffect(() => {
+    latestPropsRef.current = props;
+  }, [props]);
 
   useEffect(() => {
     saveMidiMappingState(mappingState);
   }, [mappingState]);
-
-  const selectedInput = useMemo(
-    () => inputs.find((input) => input.id === mappingState.inputId) ?? null,
-    [inputs, mappingState.inputId]
-  );
 
   useEffect(() => {
     if (!isMidiSupported()) return;
@@ -119,9 +117,6 @@ export function MidiMapper(props: MidiMapperProps) {
     if (!midiAccessRef.current) return;
     const activeInput = midiAccessRef.current.inputs.get(mappingState.inputId);
     if (!activeInput || !mappingState.enabled) {
-      if (selectedInput) {
-        selectedInput.onmidimessage = null;
-      }
       return;
     }
 
@@ -219,7 +214,17 @@ export function MidiMapper(props: MidiMapperProps) {
     return () => {
       activeInput.onmidimessage = null;
     };
-  }, [learningTarget, mappingState.bindings, mappingState.enabled, mappingState.inputId, selectedInput]);
+  }, [learningTarget, mappingState.bindings, mappingState.enabled, mappingState.inputId]);
+
+  const handleToggleEnabled = () => {
+    if (!isMidiSupported()) {
+      setStatus('This browser does not support the Web MIDI API.');
+      return;
+    }
+
+    setLearningTarget(null);
+    setMappingState((current) => ({ ...current, enabled: !current.enabled }));
+  };
 
   return (
     <section className={styles.panel} aria-label="MIDI controller mapping">
@@ -228,13 +233,7 @@ export function MidiMapper(props: MidiMapperProps) {
         <button
           type="button"
           className={`${styles.toggle} ${mappingState.enabled ? styles.toggleActive : ''}`}
-          onClick={() => {
-            if (!isMidiSupported()) {
-              setStatus('This browser does not support the Web MIDI API.');
-              return;
-            }
-            setMappingState((current) => ({ ...current, enabled: !current.enabled }));
-          }}
+          onClick={handleToggleEnabled}
         >
           {mappingState.enabled ? 'On' : 'Off'}
         </button>
@@ -260,41 +259,45 @@ export function MidiMapper(props: MidiMapperProps) {
           </select>
         </label>
       </div>
-      <div className={styles.grid}>
-        {TARGET_ORDER.map((target) => (
-          <div key={target} className={styles.mappingRow}>
-            <span className={styles.target}>{MIDI_TARGET_LABELS[target]}</span>
-            <span className={styles.binding}>{describeBinding(mappingState.bindings[target])}</span>
-            <button
-              type="button"
-              className={`${styles.actionBtn} ${learningTarget === target ? styles.learnActive : ''}`}
-              onClick={() => {
-                setLearningTarget((current) => (current === target ? null : target));
-              }}
-            >
-              {learningTarget === target ? 'Listening' : 'Learn'}
-            </button>
-            <button
-              type="button"
-              className={styles.clearBtn}
-              onClick={() => {
-                setMappingState((current) => {
-                  const nextBindings = { ...current.bindings };
-                  delete nextBindings[target];
-                  return { ...current, bindings: nextBindings };
-                });
-                if (learningTarget === target) setLearningTarget(null);
-              }}
-              disabled={!mappingState.bindings[target]}
-            >
-              Clear
-            </button>
+      {mappingState.enabled ? (
+        <>
+          <div className={styles.grid}>
+            {TARGET_ORDER.map((target) => (
+              <div key={target} className={styles.mappingRow}>
+                <span className={styles.target}>{MIDI_TARGET_LABELS[target]}</span>
+                <span className={styles.binding}>{describeBinding(mappingState.bindings[target])}</span>
+                <button
+                  type="button"
+                  className={`${styles.actionBtn} ${learningTarget === target ? styles.learnActive : ''}`}
+                  onClick={() => {
+                    setLearningTarget((current) => (current === target ? null : target));
+                  }}
+                >
+                  {learningTarget === target ? 'Listening' : 'Learn'}
+                </button>
+                <button
+                  type="button"
+                  className={styles.clearBtn}
+                  onClick={() => {
+                    setMappingState((current) => {
+                      const nextBindings = { ...current.bindings };
+                      delete nextBindings[target];
+                      return { ...current, bindings: nextBindings };
+                    });
+                    if (learningTarget === target) setLearningTarget(null);
+                  }}
+                  disabled={!mappingState.bindings[target]}
+                >
+                  Clear
+                </button>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-      <p className={styles.status}>
-        {learningTarget ? `Move a MIDI control for ${MIDI_TARGET_LABELS[learningTarget]}.` : status}
-      </p>
+          <p className={styles.status}>
+            {learningTarget ? `Move a MIDI control for ${MIDI_TARGET_LABELS[learningTarget]}.` : status}
+          </p>
+        </>
+      ) : null}
       {!isMidiSupported() ? (
         <p className={styles.note}>Web MIDI is not available in this browser.</p>
       ) : null}

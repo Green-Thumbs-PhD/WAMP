@@ -38,6 +38,13 @@
   color: #9da5ae;
 }
 
+.tunerHeader {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: #d0a95d;
+}
+
 .controlRow {
   display: flex;
   flex-wrap: wrap;

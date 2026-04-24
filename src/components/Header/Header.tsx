@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import styles from './Header.module.css';
 import { Knob } from '../Knob/Knob';
 import { LevelMeter } from '../LevelMeter/LevelMeter';
@@ -51,9 +51,11 @@ export function Header({
     stop,
     masterVolume,
     inputTrim,
+    inputMuted,
     muted,
     setMasterVolume,
     setInputTrim,
+    setInputMuted,
     setMuted,
     inputLevel,
     outputLevel,
@@ -68,8 +70,9 @@ export function Header({
     looperStop,
   } = useAudioEngineContext();
   const tapTimesRef = useRef<number[]>([]);
+  const [audioScanToken, setAudioScanToken] = useState(0);
 
-  const handleTapTempo = () => {
+  const handleTapTempo = useCallback(() => {
     const now = performance.now();
     const taps = tapTimesRef.current.filter((time) => now - time < 2000);
     taps.push(now);
@@ -83,9 +86,9 @@ export function Header({
     if (avg >= 120 && avg <= 3000) {
       applyTapTempoToEffects(Math.round(60000 / avg));
     }
-  };
+  }, [applyTapTempoToEffects]);
 
-  const handleLooperRecordToggle = () => {
+  const handleLooperRecordToggle = useCallback(() => {
     if (looperStatus === 'recording') {
       void looperStopRecord();
       return;
@@ -93,9 +96,9 @@ export function Header({
     if (looperStatus !== 'playing') {
       looperStartRecord();
     }
-  };
+  }, [looperStartRecord, looperStatus, looperStopRecord]);
 
-  const handleLooperPlayToggle = () => {
+  const handleLooperPlayToggle = useCallback(() => {
     if (looperStatus === 'playing') {
       looperStop();
       return;
@@ -103,7 +106,7 @@ export function Header({
     if (looperStatus === 'ready') {
       looperPlay();
     }
-  };
+  }, [looperPlay, looperStatus, looperStop]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -185,10 +188,6 @@ export function Header({
 
       <div className={styles.controlsRow}>
         <div className={styles.left}>
-        <div className={styles.ioStack}>
-          <InputSelector onSelect={onInputSelect} disabled={false} />
-          <OutputSelector onSelect={onOutputSelect} disabled={false} />
-        </div>
         <div className={styles.midiSection}>
           <MidiMapper
             isRunning={isRunning}
@@ -214,6 +213,37 @@ export function Header({
             onRecallCompare={onRecallCompare}
           />
         </div>
+        <div className={styles.ioStack}>
+          <button
+            type="button"
+            className={styles.scanBtn}
+            onClick={() => setAudioScanToken((current) => current + 1)}
+          >
+            Scan Audio Connections
+          </button>
+          <div className={styles.selectorRow}>
+            <InputSelector onSelect={onInputSelect} disabled={false} refreshToken={audioScanToken} />
+            <button
+              type="button"
+              className={`${styles.utilityBtn} ${inputMuted ? styles.utilityBtnActive : ''}`}
+              onClick={() => setInputMuted(!inputMuted)}
+              aria-pressed={inputMuted}
+            >
+              Mute MIC
+            </button>
+          </div>
+          <div className={styles.selectorRow}>
+            <OutputSelector onSelect={onOutputSelect} disabled={false} refreshToken={audioScanToken} />
+            <button
+              type="button"
+              className={`${styles.utilityBtn} ${muted ? styles.utilityBtnActive : ''}`}
+              onClick={() => setMuted(!muted)}
+              aria-pressed={muted}
+            >
+              Mute ALL
+            </button>
+          </div>
+        </div>
         </div>
 
         <div className={styles.right}>
@@ -237,13 +267,6 @@ export function Header({
                 size={44}
                 ariaLabel="Master output level"
               />
-              <button
-                type="button"
-                className={`${styles.utilityBtn} ${muted ? styles.utilityBtnActive : ''}`}
-                onClick={() => setMuted(!muted)}
-              >
-                {muted ? 'Muted' : 'Mute'}
-              </button>
               <div className={styles.compareSection}>
                 <div className={styles.compareLabel}>Preset A/B</div>
                 <div className={styles.compareButtons}>

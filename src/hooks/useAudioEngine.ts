@@ -5,9 +5,11 @@ import type { PresetEffectSlot, RigSnapshot } from '../types/presets';
 import type { RackState } from '../types/rack';
 import { normalizeRackState } from '../types/rack';
 import { loadLastSession, saveLastSession } from '../storage/appStorage';
-import type { LooperStatus } from '../audio/PostChainLooper';
+import type { BackingTrackState } from '../audio/BackingTrackPlayer';
+import type { LooperState, LooperStatus } from '../audio/PostChainLooper';
 import type { CabinetIrSummary } from '../types/cabinetIr';
 import type { TunerSnapshot } from '../types/tuner';
+import type { DrumKitPresetId } from '../audio/DrumKit';
 import {
   deleteCabinetIr,
   getCabinetIr,
@@ -39,6 +41,7 @@ export function useAudioEngine() {
   const [lockedPedalIds, setLockedPedalIds] = useState<string[]>([]);
   const [masterVolume, setMasterVolumeState] = useState(sessionRackRef.current.masterVolume);
   const [inputTrim, setInputTrimState] = useState(sessionRackRef.current.inputTrim);
+  const [inputMuted, setInputMutedState] = useState(sessionRackRef.current.inputMuted);
   const [muted, setMutedState] = useState(sessionRackRef.current.muted);
   const [ampChannel, setAmpChannelState] = useState(sessionRackRef.current.ampChannel);
   const [ampPresence, setAmpPresenceState] = useState(sessionRackRef.current.ampPresence);
@@ -56,6 +59,29 @@ export function useAudioEngine() {
   const [contextState, setContextState] = useState<AudioContextState | null>(null);
   const [looperStatus, setLooperStatus] = useState<LooperStatus>('idle');
   const [looperDuration, setLooperDuration] = useState(0);
+  const [looperState, setLooperState] = useState<LooperState>({
+    status: 'idle',
+    sourceDuration: 0,
+    trimmedDuration: 0,
+    trimStart: 0,
+    trimEnd: 0,
+    currentTime: 0,
+    level: 0.85,
+    recordLength: 8,
+    peaks: [],
+  });
+  const [backingTrackState, setBackingTrackState] = useState<BackingTrackState>({
+    name: '',
+    duration: 0,
+    currentTime: 0,
+    isPlaying: false,
+    volume: 0.8,
+    sectionStart: 0,
+    sectionEnd: 0,
+    sectionLoopEnabled: false,
+    playbackRate: 1,
+    peaks: [],
+  });
   const [metronomeBpm, setMetronomeBpmState] = useState(sessionRackRef.current.metronomeBpm);
   const [metronomeRunning, setMetronomeRunning] = useState(sessionRackRef.current.metronomeRunning);
   const [padsThroughChain, setPadsThroughChainState] = useState(sessionRackRef.current.padsThroughChain);
@@ -73,6 +99,7 @@ export function useAudioEngine() {
   const [outputRecorderDuration, setOutputRecorderDuration] = useState(0);
   const [lastRecordingUrl, setLastRecordingUrl] = useState('');
   const [lastRecordingName, setLastRecordingName] = useState('');
+  const [lastRecordingDuration, setLastRecordingDuration] = useState(0);
   const [performanceSnapshot, setPerformanceSnapshot] = useState({
     baseLatencyMs: 0,
     outputLatencyMs: 0,
@@ -142,8 +169,14 @@ export function useAudioEngine() {
   }, [queueSessionSave]);
 
   const syncLooper = useCallback(() => {
-    setLooperStatus(engineRef.current.getLooperStatus());
-    setLooperDuration(engineRef.current.getLooperDuration());
+    const nextLooperState = engineRef.current.getLooperState();
+    setLooperState(nextLooperState);
+    setLooperStatus(nextLooperState.status);
+    setLooperDuration(nextLooperState.trimmedDuration);
+  }, []);
+
+  const syncBackingTrack = useCallback(() => {
+    setBackingTrackState(engineRef.current.getBackingTrackState());
   }, []);
 
   const getRackState = useCallback((): RackState => {
@@ -197,6 +230,7 @@ export function useAudioEngine() {
 
     engineRef.current.setMasterVolume(nextRack.masterVolume);
     engineRef.current.setInputTrim(nextRack.inputTrim);
+    engineRef.current.setInputMuted(nextRack.inputMuted);
     engineRef.current.setMuted(nextRack.muted);
     engineRef.current.setAmpChannel(nextRack.ampChannel);
     engineRef.current.setAmpPresence(nextRack.ampPresence);
@@ -215,6 +249,7 @@ export function useAudioEngine() {
 
     setMasterVolumeState(nextRack.masterVolume);
     setInputTrimState(nextRack.inputTrim);
+    setInputMutedState(engineRef.current.isInputMuted());
     setMutedState(nextRack.muted);
     setAmpChannelState(engineRef.current.getAmpChannel());
     setAmpPresenceState(engineRef.current.getAmpPresence());
@@ -286,11 +321,12 @@ export function useAudioEngine() {
       }
 
       syncLooper();
+      syncBackingTrack();
       setCabinetIrName(engineRef.current.getCabinetIrName());
       setCabinetIrEnabledState(engineRef.current.isCabinetIrEnabled());
       setCabinetIrMixState(engineRef.current.getCabinetIrMix());
     },
-    [applyRackState, applyRigSnapshot, clearCabinetIrSelection, restoreCabinetIrSelection, syncLooper]
+    [applyRackState, applyRigSnapshot, clearCabinetIrSelection, restoreCabinetIrSelection, syncBackingTrack, syncLooper]
   );
 
   const stop = useCallback(() => {
@@ -300,6 +336,29 @@ export function useAudioEngine() {
     setContextState(null);
     setLooperStatus('idle');
     setLooperDuration(0);
+    setLooperState({
+      status: 'idle',
+      sourceDuration: 0,
+      trimmedDuration: 0,
+      trimStart: 0,
+      trimEnd: 0,
+      currentTime: 0,
+      level: 0.85,
+      recordLength: 8,
+      peaks: [],
+    });
+    setBackingTrackState({
+      name: '',
+      duration: 0,
+      currentTime: 0,
+      isPlaying: false,
+      volume: 0.8,
+      sectionStart: 0,
+      sectionEnd: 0,
+      sectionLoopEnabled: false,
+      playbackRate: 1,
+      peaks: [],
+    });
     setMetronomeRunning(false);
     setCabinetIrEnabledState(sessionRackRef.current.cabinetIrEnabled);
     setCabinetIrName(sessionRackRef.current.cabinetIrName);
@@ -387,6 +446,13 @@ export function useAudioEngine() {
     engineRef.current.setInputTrim(value);
     setInputTrimState(value);
     updateSessionRack({ inputTrim: value });
+  }, [updateSessionRack]);
+
+  const setInputMuted = useCallback((value: boolean) => {
+    engineRef.current.setInputMuted(value);
+    const nextMuted = engineRef.current.isInputMuted();
+    setInputMutedState(nextMuted);
+    updateSessionRack({ inputMuted: nextMuted });
   }, [updateSessionRack]);
 
   const setMuted = useCallback((value: boolean) => {
@@ -514,7 +580,28 @@ export function useAudioEngine() {
 
   const setLooperLevel = useCallback((v: number) => {
     engineRef.current.setLooperLevel(v);
-  }, []);
+    syncLooper();
+  }, [syncLooper]);
+
+  const setLooperRecordLength = useCallback((value: number) => {
+    engineRef.current.setLooperRecordLength(value);
+    syncLooper();
+  }, [syncLooper]);
+
+  const setLooperTrimRange = useCallback((start: number, end: number) => {
+    engineRef.current.setLooperTrimRange(start, end);
+    syncLooper();
+  }, [syncLooper]);
+
+  const resetLooperTrim = useCallback(() => {
+    engineRef.current.resetLooperTrim();
+    syncLooper();
+  }, [syncLooper]);
+
+  const applyLooperTrim = useCallback(() => {
+    engineRef.current.applyLooperTrim();
+    syncLooper();
+  }, [syncLooper]);
 
   const metronomeStart = useCallback(() => {
     engineRef.current.metronomeStart();
@@ -590,6 +677,69 @@ export function useAudioEngine() {
     return engineRef.current.captureMicToPad(padIndex, 1000);
   }, []);
 
+  const loadFactoryDrumKit = useCallback((presetId: DrumKitPresetId) => {
+    return engineRef.current.loadFactoryDrumKit(presetId);
+  }, []);
+
+  const exportDrumPadKitSnapshot = useCallback(() => {
+    return engineRef.current.exportDrumPadKitSnapshot();
+  }, []);
+
+  const importDrumPadKitSnapshot = useCallback((snapshot: { padBuffers: { sampleRate: number; samples: number[] }[] }) => {
+    return engineRef.current.importDrumPadKitSnapshot(snapshot);
+  }, []);
+
+  const loadBackingTrack = useCallback(async (file: File) => {
+    const loaded = await engineRef.current.loadBackingTrack(file);
+    syncBackingTrack();
+    return loaded;
+  }, [syncBackingTrack]);
+
+  const playBackingTrack = useCallback(() => {
+    engineRef.current.playBackingTrack();
+    syncBackingTrack();
+  }, [syncBackingTrack]);
+
+  const pauseBackingTrack = useCallback(() => {
+    engineRef.current.pauseBackingTrack();
+    syncBackingTrack();
+  }, [syncBackingTrack]);
+
+  const stopBackingTrack = useCallback(() => {
+    engineRef.current.stopBackingTrack();
+    syncBackingTrack();
+  }, [syncBackingTrack]);
+
+  const clearBackingTrack = useCallback(() => {
+    engineRef.current.clearBackingTrack();
+    syncBackingTrack();
+  }, [syncBackingTrack]);
+
+  const setBackingTrackVolume = useCallback((value: number) => {
+    engineRef.current.setBackingTrackVolume(value);
+    syncBackingTrack();
+  }, [syncBackingTrack]);
+
+  const seekBackingTrack = useCallback((value: number) => {
+    engineRef.current.seekBackingTrack(value);
+    syncBackingTrack();
+  }, [syncBackingTrack]);
+
+  const setBackingTrackSection = useCallback((start: number, end: number) => {
+    engineRef.current.setBackingTrackSection(start, end);
+    syncBackingTrack();
+  }, [syncBackingTrack]);
+
+  const setBackingTrackSectionLoopEnabled = useCallback((enabled: boolean) => {
+    engineRef.current.setBackingTrackSectionLoopEnabled(enabled);
+    syncBackingTrack();
+  }, [syncBackingTrack]);
+
+  const setBackingTrackPlaybackRate = useCallback((rate: number) => {
+    engineRef.current.setBackingTrackPlaybackRate(rate);
+    syncBackingTrack();
+  }, [syncBackingTrack]);
+
   const loadCabinetIr = useCallback(async (file: File) => {
     setCabinetIrLibraryBusy(true);
     try {
@@ -656,15 +806,19 @@ export function useAudioEngine() {
       outputRecordingStartedAtRef.current = performance.now();
       setOutputRecorderActive(true);
       setOutputRecorderDuration(0);
+      setLastRecordingDuration(0);
     }
     return started;
   }, []);
 
   const stopOutputRecording = useCallback(async () => {
     const blob = await engineRef.current.stopOutputRecording();
+    const startedAt = outputRecordingStartedAtRef.current;
+    const duration = startedAt === null ? 0 : Math.max(0, (performance.now() - startedAt) / 1000);
     outputRecordingStartedAtRef.current = null;
     setOutputRecorderActive(false);
     setOutputRecorderDuration(0);
+    setLastRecordingDuration(duration);
     if (!blob) return null;
     if (lastRecordingUrl) URL.revokeObjectURL(lastRecordingUrl);
     const url = URL.createObjectURL(blob);
@@ -673,6 +827,18 @@ export function useAudioEngine() {
     setLastRecordingName(`wamp-output-${stamp}.webm`);
     return { url, blob };
   }, [lastRecordingUrl]);
+
+  const clearLastOutputRecording = useCallback(() => {
+    outputRecordingStartedAtRef.current = null;
+    setOutputRecorderActive(false);
+    setOutputRecorderDuration(0);
+    setLastRecordingDuration(0);
+    setLastRecordingName('');
+    setLastRecordingUrl((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return '';
+    });
+  }, []);
 
   const renameCabinetIrEntry = useCallback(async (id: string, name: string) => {
     const trimmed = name.trim();
@@ -720,6 +886,11 @@ export function useAudioEngine() {
       setInputLevel(engineRef.current.getInputLevel());
       setOutputLevel(engineRef.current.getOutputLevel());
       setOutputPeak(engineRef.current.getOutputPeak());
+      const nextLooperState = engineRef.current.getLooperState();
+      setLooperState(nextLooperState);
+      setLooperStatus(nextLooperState.status);
+      setLooperDuration(nextLooperState.trimmedDuration);
+      setBackingTrackState(engineRef.current.getBackingTrackState());
       const pitch = engineRef.current.getInputPitchAnalysis();
       updateTunerSnapshot(pitch.frequency, pitch.clarity, pitch.signal);
       if (outputRecordingStartedAtRef.current !== null) {
@@ -767,6 +938,7 @@ export function useAudioEngine() {
     lockedPedalIds,
     masterVolume,
     inputTrim,
+    inputMuted,
     muted,
     ampChannel,
     ampPresence,
@@ -778,6 +950,8 @@ export function useAudioEngine() {
     contextState,
     looperStatus,
     looperDuration,
+    looperState,
+    backingTrackState,
     metronomeBpm,
     metronomeRunning,
     padsThroughChain,
@@ -795,6 +969,7 @@ export function useAudioEngine() {
     outputRecorderDuration,
     lastRecordingUrl,
     lastRecordingName,
+    lastRecordingDuration,
     performanceSnapshot,
     start,
     stop,
@@ -812,6 +987,7 @@ export function useAudioEngine() {
     isEffectLocked,
     setMasterVolume,
     setInputTrim,
+    setInputMuted,
     setMuted,
     setAmpChannel,
     setAmpPresence,
@@ -828,6 +1004,10 @@ export function useAudioEngine() {
     looperStop,
     looperClear,
     setLooperLevel,
+    setLooperRecordLength,
+    setLooperTrimRange,
+    resetLooperTrim,
+    applyLooperTrim,
     metronomeStart,
     metronomeStop,
     setMetronomeBpm,
@@ -839,6 +1019,19 @@ export function useAudioEngine() {
     setGlobalNoiseGateRelease,
     setGlobalNoiseGateReduction,
     captureMicToPad,
+    loadFactoryDrumKit,
+    exportDrumPadKitSnapshot,
+    importDrumPadKitSnapshot,
+    loadBackingTrack,
+    playBackingTrack,
+    pauseBackingTrack,
+    stopBackingTrack,
+    clearBackingTrack,
+    setBackingTrackVolume,
+    seekBackingTrack,
+    setBackingTrackSection,
+    setBackingTrackSectionLoopEnabled,
+    setBackingTrackPlaybackRate,
     loadCabinetIr,
     selectCabinetIr,
     renameCabinetIrEntry,
@@ -848,6 +1041,7 @@ export function useAudioEngine() {
     setCabinetIrMix,
     startOutputRecording,
     stopOutputRecording,
+    clearLastOutputRecording,
   };
 }
 

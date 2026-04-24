@@ -6,6 +6,7 @@ How to use this file:
 - Change `[ ]` to `[x]` when a feature is completed.
 - Add `KEEP`, `MAYBE`, or `REMOVE` next to any item as you refine scope.
 - Remove any item without affecting the structure of the rest of the roadmap.
+- Keep all UI changes clean feeling and user friendly. Any further arrangement changes should resemble to a rack-style stereo system. 
 
 Suggested labels:
 - `P1`: highest value / best next work
@@ -66,9 +67,9 @@ These features belong in the simulated amp rack and should each live in their ow
   Purpose: Give the rack a clearer clean / crunch / lead amp identity.
 - [x] `P2` Recorder / export tool
   Purpose: Capture wet output directly from the app.
-- [ ] `P2` Input monitor / gain staging meter
+- [x] `P2` Input monitor / gain staging meter
   Purpose: Help users set healthy levels before effects.
-- [ ] `P2` Output safety / limiter monitor
+- [x] `P2` Output safety / limiter monitor
   Purpose: Prevent accidental clipping and harsh output spikes.
 - [x] `P3` MIDI / external controller mapping
   Purpose: Support foot controllers, knobs, and preset switching from hardware.
@@ -119,48 +120,50 @@ These features improve how users store, organize, and revisit sounds.
   Purpose: Filter by clean, lead, ambient, heavy, live set, and more.
 - [x] `P1` Favorite presets
   Purpose: Make frequently used sounds easier to reach.
-- [ ] `P2` Preset rename from UI
+- [x] `P2` Preset rename from UI
   Purpose: Improve preset maintenance without deleting and recreating.
-- [ ] `P2` Preset notes / description
+- [x] `P2` Preset notes / description
   Purpose: Store context like guitar type, tuning, or intended song.
-- [ ] `P2` Import / export presets
+- [x] `P2` Import / export presets
   Purpose: Share tones or back them up.
-- [ ] `P2` Recent presets / quick recall
+- [x] `P2` Recent presets / quick recall
   Purpose: Speed up back-and-forth comparison while building sounds.
 
 ## Phase 6: Live Performance Improvements
 
 These features make the app more dependable in rehearsal and performance settings.
 
-- [ ] `P1` Clear live mode
+- [x] `P1` Clear live mode
   Purpose: Larger controls, simplified UI, fewer accidental edits.
-- [ ] `P1` Footswitch-oriented actions
+- [x] `P1` Footswitch-oriented actions
   Purpose: Map common tasks to simple external or keyboard triggers.
-- [ ] `P2` Scene / song mode
+- [x] `P2` Scene / song mode
   Purpose: Organize presets into a performance setlist.
-- [ ] `P2` Spillover strategy for delay / reverb
+- [x] `P2` Spillover strategy for delay / reverb
   Purpose: Keep tails natural when changing sounds.
-- [ ] `P2` Output mute on preset load option
+- [x] `P2` Output mute on preset load option
   Purpose: Avoid clicks or jumps during patch changes.
-- [ ] `P3` Per-song notes and cue display
+- [x] `P3` Per-song notes and cue display
   Purpose: Support practical performance workflow.
-
-## Optional / Experimental
-
-These are interesting additions, but they should be easy to cut if the app needs to stay focused.
-
-- [ ] `P3` MIDI learn for all controls
-- [ ] `P3` CPU / DSP budget warnings
-- [x] `P3` Advanced pitch tracking features
-- [ ] `P3` Harmonizer with scale awareness
-- [ ] `P3` Stereo imaging tools
-- [ ] `P3` Parallel routing / split paths
-- [ ] `P3` Dual amp mode
-- [ ] `P3` Visual theme switching
 
 ## Phase Duex: Expansion, Attraction, And Hybrid Instruments
 
 This phase builds on the current rack-and-pedal foundation and pushes WAMP toward a more complete browser music workstation, practice space, and creator tool.
+
+#### Recorder / Export Tool Discoveries
+
+- [ ] `P1` Pre-roll and auto-stop capture modes
+  Purpose: Let users arm a take, get a visual count-in, and stop cleanly at a target duration without rushed clicks.
+- [ ] `P1` Multi-take shelf with instant audition
+  Purpose: Keep the last few recorder passes available for quick compare, export, or delete instead of replacing each take immediately.
+- [ ] `P2` Trim, fade, and tail-safe export region editing
+  Purpose: Let users clean the start and end of a take before export without leaving the rack workflow.
+- [ ] `P2` Dual-lane recorder view
+  Purpose: Show dry input versus wet output activity together so clipping, latency feel, and dynamics are easier to understand while recording.
+- [ ] `P2` Take naming, notes, and quick tags
+  Purpose: Help users organize riffs, idea captures, and song-version exports without relying on timestamp-only filenames.
+- [ ] `P3` Loudness prep and share-ready export options
+  Purpose: Add normalize, limiter, and format presets so quick bounce exports feel more polished and reusable.
 
 ### Phase Duex A: Magnetic User Features
 
@@ -296,40 +299,6 @@ These are optional paths if the product ever needs a stronger premium identity o
 - [ ] `P3` Marketplace-style preset exchange
   Purpose: Create a library of downloadable or community-submitted rigs and packs.
 
-## Recommended Build Order
-
-If the goal is strongest value with the least chaos, build in this order:
-
-1. Tool registry for rack modules
-2. Preset schema expansion
-3. Tuner
-4. Noise Gate pedal
-5. Boost / Preamp pedal
-6. Phaser pedal
-7. Preset A/B compare
-8. IR library manager
-9. Input trim and panic button
-10. Amp channel selector
-11. Flanger pedal
-12. Graphic EQ pedal
-13. Recorder / export tool
-14. Everything marked `P3`
-
-## Current Recommended Scope
-
-If you want a focused version of the product, keep this set first:
-
-- [x] Tool registry for rack modules
-- [x] Preset schema expansion
-- [x] Tuner
-- [x] Noise Gate pedal
-- [x] Boost / Preamp pedal
-- [x] Phaser pedal
-- [x] Preset A/B compare
-- [x] IR library manager
-- [x] Input trim
-- [x] Global mute / panic button
-
 ## Easy Cuts
 
 These are the cleanest items to remove if you want to keep the app tighter:
@@ -363,6 +332,8 @@ Add new items here whenever a limitation, restriction, or temporary workaround i
   Impact: External controller mapping may be unavailable in unsupported browsers or until MIDI permission is granted, and mappings are saved locally in this browser profile.
 - [ ] Output recording and export depend on the browser MediaRecorder API and supported audio container formats.
   Impact: Wet-output capture works in modern browsers, but export format and availability may vary by browser.
+- [ ] The current spillover strategy is a tail-safe wait before preset replacement rather than a fully seamless dual-engine crossfade.
+  Impact: Delay and reverb tails are given time to decay more naturally before a preset swap, but they are not preserved under the new rig indefinitely.
 - [ ] The top-right CPU monitor is an in-app estimate based on latency, frame timing, and graph size rather than a hardware-level CPU reading.
   Impact: It is useful for relative performance tracking inside the app, but it should not be treated as an exact system CPU measurement.
 - [ ] In the current Codex workspace environment, Vite commands may fail inside the sandbox with `spawn EPERM`.

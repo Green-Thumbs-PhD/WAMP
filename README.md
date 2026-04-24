@@ -1,8 +1,10 @@
 # WAMP
 
-WAMP is a browser-based guitar and audio practice rig built with React, TypeScript, and the Web Audio API. It combines a pedalboard, rack utilities, preset workflow, cabinet IR management, MIDI mapping, drum pads, metronome, tuner, looper controls, amp voicing, output recording, and a hideable CPU monitor in one browser app.
+WAMP is a browser-based guitar and audio practice rig built with React, TypeScript, and the Web Audio API. It combines a pedalboard, rack utilities, preset workflow, cabinet IR management, MIDI mapping, drum pads, metronome, tuner, an expanded looper and backing-track practice workstation, amp voicing, output recording, and a hideable CPU monitor in one browser app.
 
 This README is based on the current implementation in the app plus the completed items in [ROADMAP.md](./ROADMAP.md).
+
+Shortcut and control-input documentation lives in [HOTKEYS.md](./HOTKEYS.md).
 
 ## What WAMP Can Do
 
@@ -11,14 +13,15 @@ This README is based on the current implementation in the app plus the completed
 - Switch between factory presets and user-created presets
 - Compare two rig snapshots with A/B recall
 - Organize presets with categories, tags, and favorites
-- Control input trim, master output, and instant mute
+- Control input trim, dedicated mic mute, master output, and global output mute
 - Use a built-in tuner with confidence and signal tracking plus a tempo-aware metronome
-- Record and replay a post-effects loop
+- Record and replay a post-effects loop with trim editing and selectable loop length
+- Load backing tracks and repeat marked song sections without leaving the app
 - Record and export the wet output of the full rig
 - Import, queue, enable, blend, rename, and delete cabinet IRs
 - Switch amp voicing between clean, crunch, and lead channels
 - Apply a global pre-chain noise gate from the rack
-- Trigger browser drum pads and optionally route them through the pedal chain
+- Trigger browser drum pads, run a built-in drum machine sequencer, and optionally route them through the pedal chain
 - Capture 1 second of microphone audio into a selected drum pad
 - Map transport and rig functions to external MIDI controls
 - Open a hideable top-right CPU and latency monitor overlay
@@ -67,13 +70,13 @@ Pedal workflow features:
 
 Current rack tool modules:
 
+- Metronome / tuner
 - Amp channel selector
 - Cab IR Manager
 - Global input noise gate
 - Recorder / export
-- Looper
-- Metronome / tuner
-- Drum pads
+- Looper / backing-track practice station
+- Drum pads / sequencer
 - MIDI mapper in the header control area
 - CPU / latency monitor as a hideable top-right overlay
 
@@ -90,8 +93,9 @@ Current rack tool modules:
 ### UI And Workflow Improvements
 
 - Input and output device selection
+- Manual audio device scan from the header
 - Keyboard shortcuts for transport and performance actions
-- Panic-style global mute
+- Separate mic mute and global output mute
 - Input and output level metering
 - Hideable CPU / latency monitor in the top-right corner of the app
 - Theme presets for multiple studio looks
@@ -104,8 +108,9 @@ Current rack tool modules:
 1. Open WAMP in a supported desktop browser.
 2. Choose your input device from the `Input` selector.
 3. If your browser supports output routing, choose an output device from `Output`.
-4. Press `START` to grant microphone access and initialize audio.
-5. If audio is suspended by browser policy, resume it when prompted.
+4. Use `Scan Audio Connections` if you have plugged in an interface, headset, or other device after the page was already open.
+5. Press `START` to grant microphone access and initialize audio.
+6. If audio is suspended by browser policy, resume it when prompted.
 
 Guidelines:
 
@@ -187,8 +192,11 @@ Guidelines:
 Available live controls in the header:
 
 - `Input Trim`
+- `Mute MIC`
 - `Master`
-- `Mute`
+- `Mute ALL`
+- `Scan Audio Connections`
+- Input and output selectors
 - Input level meter
 - Output level meter
 - MIDI mapper
@@ -196,7 +204,9 @@ Available live controls in the header:
 Guidelines:
 
 - Use `Input Trim` to improve gain staging before the pedal chain.
-- Use `Mute` as the immediate panic button for feedback or unexpected volume spikes.
+- Use `Mute MIC` when you want to silence the incoming instrument or microphone without killing backing tracks or other playback.
+- Use `Mute ALL` as the immediate panic button for feedback or unexpected volume spikes.
+- Use `Scan Audio Connections` after connecting or powering on a new interface or headset.
 - Output level reflects post-chain level.
 
 ### 8. Amp Channel Selector
@@ -244,20 +254,32 @@ Guidelines:
 - The recorder captures the full processed output, including rack voicing, pedals, IR, and other downstream rack tools.
 - Export format depends on browser `MediaRecorder` support.
 
-### 11. Looper
+### 11. Looper And Backing Tracks
 
-The looper records after the full effects chain.
+The looper rack tool is now a full practice workstation. It records after the full effects chain and also lets you load songs or loops into the same rig.
 
-1. Press `Record` to begin capturing the wet signal.
-2. Press again to stop and save the loop.
-3. Press `Play` to hear the loop.
-4. Use `Stop loop` or `Clear` when needed.
-5. Adjust playback level with the looper level slider.
+Looper workflow:
+
+1. Choose a loop capture length from the `Loop Length` selector.
+2. Press `Record` to capture the wet signal.
+3. Stop recording manually or let the selected loop length end automatically.
+4. Press `Play` to loop the phrase.
+5. Use the waveform and `Loop Start` / `Loop End` controls to trim the loop visually.
+6. Press `Apply Trim` to commit the trimmed loop, or `Reset Trim` to restore the full capture.
+
+Backing-track workflow:
+
+1. Press `Load Track` and choose a song, jam track, or loop.
+2. Use `Play`, `Pause`, `Stop`, and the track-position slider for transport.
+3. Set `Track Vol` to blend the backing track against your live rig.
+4. Use `Section Start` and `Section End` to mark a passage.
+5. Turn on `Repeat Section` to keep looping that practice segment.
 
 Guidelines:
 
 - The looper is post-FX, so it captures the processed tone, not the dry input.
-- Recording is disabled while a loop is already playing.
+- Backing tracks and section repeat markers are meant for practicing through the same WAMP rig without needing another player app.
+- Visual trim and section markers are currently slider-based waveform editing, which keeps the workflow lightweight and browser-friendly.
 
 ### 12. Cab IR Manager
 
@@ -295,6 +317,7 @@ Guidelines:
 The drum pad rack includes:
 
 - Sixteen trigger pads
+- A built-in 16-step drum machine sequencer
 - Keyboard triggering
 - Optional routing through the pedal chain
 - One-second microphone capture into the selected pad
@@ -303,6 +326,7 @@ Guidelines:
 
 - Click a pad to trigger it.
 - Shift-click a pad to select it for mic capture.
+- Use the sequencer on the right side of the module to build repeating drum patterns against the current rack BPM.
 - Use `Through pedal chain` if you want pads processed by the current pedalboard.
 - Default key layout: `QWER`, `ASDF`, `ZXCV`, `UIOP`.
 
@@ -386,6 +410,7 @@ This means your data persists across refreshes on the same browser profile, but 
 - The browser-side noise gate is lightweight and may need manual threshold/release tuning in noisy setups.
 - Octaver, pitch shifter, harmonizer, freeze, and related pitch-based effects are lightweight browser implementations and may sound rougher on dense chords or fast playing.
 - The amp channel selector is a broad browser-side voicing stage rather than a deep component-level amp model.
+- Looper trim editing and practice markers are optimized for quick practice workflows rather than full DAW-style waveform editing.
 - Cabinet IR libraries are local to the current browser profile.
 - Preset favorites, categories, and tags are stored locally in the current browser profile.
 - MIDI mapping depends on Web MIDI support and granted device access.
@@ -405,7 +430,9 @@ Completed roadmap items already represented in the app include:
 - Copy / paste pedal settings
 - Preset A/B compare
 - Global mute / panic button
+- Separate mic mute and global output mute
 - Input trim control
+- Manual audio connection scan
 - Transport and tap-tempo hotkeys
 - Signal-chain mini-map
 - Lock pedal position
@@ -416,6 +443,8 @@ Completed roadmap items already represented in the app include:
 - MIDI / external controller mapping
 - Amp channel selector
 - Recorder / export tool
+- Expanded looper editing and backing-track practice tool
+- Drum machine sequencer
 - CPU / latency monitor
 - Noise Gate, Boost / Pre, Phaser, Flanger, Graphic EQ, Limiter
 - Octaver, Auto-Wah, Cab Sim, Pitch Shifter, Harmonizer, Freeze

@@ -195,6 +195,42 @@
   font-weight: 700;
 }
 
+.live-cue-banner {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+    color-mix(in srgb, var(--theme-card-active) 16%, #151112);
+  border: 1px solid color-mix(in srgb, var(--theme-card-active) 35%, var(--theme-card-border));
+}
+
+.live-cue-kicker {
+  margin: 0 0 4px;
+  color: var(--theme-card-muted);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+}
+
+.live-cue-title {
+  margin: 0;
+  color: var(--theme-card-text);
+  font-family: var(--theme-font-display);
+  font-size: clamp(1.2rem, 2.5vw, 2rem);
+}
+
+.live-cue-copy {
+  max-width: 34rem;
+  margin: 0;
+  color: var(--theme-card-text);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
 .rack-shell {
   position: relative;
   display: grid;
@@ -279,17 +315,10 @@
 
 .theme-strip-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   gap: 18px;
-  align-items: flex-end;
-}
-
-.theme-strip-kicker {
-  margin: 0 0 4px;
-  color: var(--theme-card-muted);
-  font-size: 0.68rem;
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
+  align-items: center;
+  text-align: center;
 }
 
 .theme-strip-title {
@@ -379,6 +408,7 @@
 }
 
 .rack-slot {
+  position: relative;
   width: 100%;
   padding: 10px 14px;
   border-radius: 14px;
@@ -387,14 +417,98 @@
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.1),
     inset 0 -1px 0 rgba(0, 0, 0, 0.55);
+  cursor: grab;
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    opacity 0.16s ease;
 }
 
-.rack-slot > * {
+.rack-slot-content {
   width: 100%;
+  padding-top: 1.6rem;
+}
+
+.rack-slot-label {
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  max-width: calc(100% - 8.8rem);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--theme-card-muted);
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.rack-slot-minimize {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  z-index: 1;
+  font: inherit;
+  padding: 0.24rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--theme-card-border) 92%, rgba(255, 255, 255, 0.08));
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(0, 0, 0, 0.22)),
+    color-mix(in srgb, var(--theme-card-active) 8%, #151316);
+  color: var(--theme-card-text);
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    transform 0.16s ease,
+    border-color 0.16s ease,
+    background 0.16s ease;
+}
+
+.rack-slot-minimize:hover {
+  transform: translateY(-1px);
+  border-color: var(--theme-card-active);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(0, 0, 0, 0.18)),
+    color-mix(in srgb, var(--theme-card-active) 15%, #181519);
+}
+
+.rack-slot-dragging {
+  opacity: 0.7;
+  cursor: grabbing;
+}
+
+.rack-slot-minimized {
+  min-height: 3.1rem;
+  border-color: color-mix(in srgb, var(--theme-card-active) 36%, var(--theme-slot-border));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 0 1px color-mix(in srgb, var(--theme-card-active) 18%, transparent);
 }
 
 .pedal-area {
   min-height: 0;
+}
+
+.app[data-live-mode='true'] .theme-strip,
+.app[data-live-mode='true'] .app-hint,
+.app[data-live-mode='true'] .rack-badge-row {
+  display: none;
+}
+
+.app[data-live-mode='true'] .studio {
+  gap: 12px;
+}
+
+.app[data-live-mode='true'] .rack-slot {
+  padding: 14px 18px;
+}
+
+.app[data-live-mode='true'] .rack-slot-minimize {
+  top: 14px;
+  right: 18px;
 }
 
 @media (max-width: 900px) {
@@ -411,16 +525,25 @@
   }
 
   .theme-strip-header {
+    justify-content: center;
+    align-items: center;
+  }
+
+  .live-cue-banner {
     flex-direction: column;
     align-items: flex-start;
   }
 
-  .theme-strip-copy {
-    text-align: left;
-  }
-
   .theme-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .rack-slot-minimize {
+    right: 12px;
+  }
+
+  .rack-slot-label {
+    left: 12px;
   }
 }
 

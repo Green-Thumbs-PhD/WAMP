@@ -20,5 +20,7 @@ export interface Preset {
   rack: RigSnapshot['rack'];
   category: string;
   tags: string[];
+  description: string;
+  notes: string;
   favorite: boolean;
 }

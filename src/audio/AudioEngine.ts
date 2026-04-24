@@ -1,9 +1,10 @@
 import type { EffectNode, EffectType, EffectSlotState } from '../types/effects';
 import type { PitchAnalysis } from '../types/tuner';
 import { createEffect } from './effects';
-import { PostChainLooper, type LooperStatus } from './PostChainLooper';
+import { BackingTrackPlayer, type BackingTrackState } from './BackingTrackPlayer';
+import { PostChainLooper, type LooperState, type LooperStatus } from './PostChainLooper';
 import { MetronomeEngine } from './MetronomeEngine';
-import { buildFactoryKit } from './DrumKit';
+import { buildFactoryKit, type DrumKitPresetId } from './DrumKit';
 
 export class AudioEngine {
   private ctx: AudioContext | null = null;
@@ -31,6 +32,7 @@ export class AudioEngine {
   private effects: EffectNode[] = [];
   private masterVolume = 1;
   private inputTrim = 1;
+  private inputMuted = false;
   private muted = false;
   private ampChannel: 'clean' | 'crunch' | 'lead' = 'clean';
   private ampPresence = 55;
@@ -47,6 +49,7 @@ export class AudioEngine {
   private looperGain: GainNode | null = null;
   private recordDest: MediaStreamAudioDestinationNode | null = null;
   private looper: PostChainLooper | null = null;
+  private backingTrack: BackingTrackPlayer | null = null;
   private outputRecorder: MediaRecorder | null = null;
   private outputRecorderChunks: Blob[] = [];
 
@@ -83,7 +86,7 @@ export class AudioEngine {
     this.padBus.gain.value = 1;
 
     this.inputGain = this.ctx.createGain();
-    this.inputGain.gain.value = this.inputTrim;
+    this.inputGain.gain.value = this.inputMuted ? 0 : this.inputTrim;
     this.ampInput = this.ctx.createGain();
     this.ampDriveGain = this.ctx.createGain();
     this.ampShaper = this.ctx.createWaveShaper();
@@ -112,6 +115,7 @@ export class AudioEngine {
     this.looperGain.gain.value = 0;
     this.recordDest = this.ctx.createMediaStreamDestination();
     this.looper = new PostChainLooper(this.ctx, this.looperGain, this.recordDest);
+    this.backingTrack = new BackingTrackPlayer(this.ctx, this.outputGain);
 
     this.metronomeGain = this.ctx.createGain();
     this.metronomeGain.gain.value = 0.9;
@@ -189,6 +193,8 @@ export class AudioEngine {
     this.outputRecorderChunks = [];
     this.looper?.dispose();
     this.looper = null;
+    this.backingTrack?.dispose();
+    this.backingTrack = null;
     this.metronome?.dispose();
     this.metronome = null;
 
@@ -308,6 +314,40 @@ export class AudioEngine {
     };
   }
 
+  loadFactoryDrumKit(presetId: DrumKitPresetId): boolean {
+    if (!this.ctx) return false;
+    this.padBuffers = buildFactoryKit(this.ctx, presetId);
+    return true;
+  }
+
+  exportDrumPadKitSnapshot(): { padBuffers: { sampleRate: number; samples: number[] }[] } {
+    const padBuffers = this.padBuffers.map((buffer) => ({
+      sampleRate: buffer.sampleRate,
+      samples: Array.from(buffer.getChannelData(0)),
+    }));
+    return { padBuffers };
+  }
+
+  importDrumPadKitSnapshot(snapshot: { padBuffers: { sampleRate: number; samples: number[] }[] }): boolean {
+    if (!this.ctx || !Array.isArray(snapshot.padBuffers) || snapshot.padBuffers.length !== 16) return false;
+    const nextBuffers: AudioBuffer[] = [];
+    for (const entry of snapshot.padBuffers) {
+      if (!entry || !Array.isArray(entry.samples) || !Number.isFinite(entry.sampleRate) || entry.sampleRate <= 0) {
+        return false;
+      }
+      const length = entry.samples.length;
+      if (length < 1) return false;
+      const audioBuffer = this.ctx.createBuffer(1, length, entry.sampleRate);
+      const channelData = audioBuffer.getChannelData(0);
+      for (let i = 0; i < length; i++) {
+        channelData[i] = Math.max(-1, Math.min(1, Number(entry.samples[i] ?? 0)));
+      }
+      nextBuffers.push(audioBuffer);
+    }
+    this.padBuffers = nextBuffers;
+    return true;
+  }
+
   async captureMicToPad(padIndex: number, durationMs = 1000): Promise<boolean> {
     if (!this.ctx || !this.stream || padIndex < 0 || padIndex >= 16) return false;
 
@@ -359,6 +399,10 @@ export class AudioEngine {
     await this.looper?.stopRecording();
   }
 
+  setLooperRecordLength(length: number): void {
+    this.looper?.setRecordLength(length);
+  }
+
   looperPlay(): void {
     this.looper?.play();
   }
@@ -375,12 +419,94 @@ export class AudioEngine {
     this.looper?.setLevel(level);
   }
 
+  setLooperTrimRange(start: number, end: number): void {
+    this.looper?.setTrimRange(start, end);
+  }
+
+  resetLooperTrim(): void {
+    this.looper?.resetTrim();
+  }
+
+  applyLooperTrim(): void {
+    this.looper?.applyTrim();
+  }
+
   getLooperStatus(): LooperStatus {
     return this.looper?.getStatus() ?? 'idle';
   }
 
   getLooperDuration(): number {
     return this.looper?.getLoopDuration() ?? 0;
+  }
+
+  getLooperState(): LooperState {
+    return this.looper?.getState() ?? {
+      status: 'idle',
+      sourceDuration: 0,
+      trimmedDuration: 0,
+      trimStart: 0,
+      trimEnd: 0,
+      currentTime: 0,
+      level: 0.85,
+      recordLength: 8,
+      peaks: [],
+    };
+  }
+
+  async loadBackingTrack(file: File): Promise<boolean> {
+    const arrayBuffer = await file.arrayBuffer();
+    return this.backingTrack?.loadFromArrayBuffer(arrayBuffer, file.name) ?? false;
+  }
+
+  playBackingTrack(): void {
+    this.backingTrack?.play();
+  }
+
+  pauseBackingTrack(): void {
+    this.backingTrack?.pause();
+  }
+
+  stopBackingTrack(): void {
+    this.backingTrack?.stop();
+  }
+
+  clearBackingTrack(): void {
+    this.backingTrack?.clear();
+  }
+
+  setBackingTrackVolume(value: number): void {
+    this.backingTrack?.setVolume(value);
+  }
+
+  seekBackingTrack(value: number): void {
+    this.backingTrack?.setCurrentTime(value);
+  }
+
+  setBackingTrackSection(start: number, end: number): void {
+    this.backingTrack?.setSection(start, end);
+  }
+
+  setBackingTrackSectionLoopEnabled(enabled: boolean): void {
+    this.backingTrack?.setSectionLoopEnabled(enabled);
+  }
+
+  setBackingTrackPlaybackRate(rate: number): void {
+    this.backingTrack?.setPlaybackRate(rate);
+  }
+
+  getBackingTrackState(): BackingTrackState {
+    return this.backingTrack?.getState() ?? {
+      name: '',
+      duration: 0,
+      currentTime: 0,
+      isPlaying: false,
+      volume: 0.8,
+      sectionStart: 0,
+      sectionEnd: 0,
+      sectionLoopEnabled: false,
+      playbackRate: 1,
+      peaks: [],
+    };
   }
 
   // --- Metronome ---
@@ -652,13 +778,27 @@ export class AudioEngine {
 
   setInputTrim(value: number): void {
     this.inputTrim = value;
-    if (this.inputGain) {
-      this.inputGain.gain.linearRampToValueAtTime(value, (this.ctx?.currentTime ?? 0) + 0.01);
-    }
+    this.updateInputGain();
   }
 
   getInputTrim(): number {
     return this.inputTrim;
+  }
+
+  private updateInputGain(): void {
+    if (this.inputGain) {
+      const target = this.inputMuted ? 0 : this.inputTrim;
+      this.inputGain.gain.linearRampToValueAtTime(target, (this.ctx?.currentTime ?? 0) + 0.01);
+    }
+  }
+
+  setInputMuted(muted: boolean): void {
+    this.inputMuted = muted;
+    this.updateInputGain();
+  }
+
+  isInputMuted(): boolean {
+    return this.inputMuted;
   }
 
   setMuted(muted: boolean): void {
@@ -892,11 +1032,7 @@ export class AudioEngine {
 
   async switchInput(deviceId: string): Promise<void> {
     if (!this.ctx || !this.sourceNode || !this.mixBus) return;
-
-    this.stream?.getTracks().forEach((t) => t.stop());
-    this.sourceNode.disconnect();
-
-    this.stream = await navigator.mediaDevices.getUserMedia({
+    const nextStream = await navigator.mediaDevices.getUserMedia({
       audio: {
         deviceId: { exact: deviceId },
         echoCancellation: false,
@@ -905,14 +1041,19 @@ export class AudioEngine {
       },
     });
 
-    this.sourceNode = this.ctx.createMediaStreamSource(this.stream);
+    const nextSourceNode = this.ctx.createMediaStreamSource(nextStream);
     if (this.globalNoiseGateGain && this.globalNoiseGateDetector && this.globalNoiseGateDetectorSink) {
-      this.sourceNode.connect(this.globalNoiseGateGain);
-      this.sourceNode.connect(this.globalNoiseGateDetector);
+      nextSourceNode.connect(this.globalNoiseGateGain);
+      nextSourceNode.connect(this.globalNoiseGateDetector);
       this.globalNoiseGateDetector.connect(this.globalNoiseGateDetectorSink);
     } else {
-      this.sourceNode.connect(this.mixBus);
+      nextSourceNode.connect(this.mixBus);
     }
+
+    this.sourceNode.disconnect();
+    this.stream?.getTracks().forEach((t) => t.stop());
+    this.stream = nextStream;
+    this.sourceNode = nextSourceNode;
   }
 
   clearChain(): void {

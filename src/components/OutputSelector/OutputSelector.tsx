@@ -8,26 +8,35 @@ const sinkSupported =
 interface OutputSelectorProps {
   onSelect: (sinkId: string) => void;
   disabled?: boolean;
+  refreshToken?: number;
 }
 
-export function OutputSelector({ onSelect, disabled = false }: OutputSelectorProps) {
+export function OutputSelector({ onSelect, disabled = false, refreshToken = 0 }: OutputSelectorProps) {
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [selected, setSelected] = useState('');
 
   useEffect(() => {
+    let active = true;
+
     async function enumerate() {
       const allDevices = await navigator.mediaDevices.enumerateDevices();
+      if (!active) return;
       const audioOutputs = allDevices.filter((d) => d.kind === 'audiooutput');
       setDevices(audioOutputs);
+      setSelected((current) => current);
     }
     enumerate();
     navigator.mediaDevices.addEventListener('devicechange', enumerate);
-    return () => navigator.mediaDevices.removeEventListener('devicechange', enumerate);
-  }, []);
+    return () => {
+      active = false;
+      navigator.mediaDevices.removeEventListener('devicechange', enumerate);
+    };
+  }, [refreshToken]);
 
   useEffect(() => {
+    if (selected && !devices.some((device) => device.deviceId === selected)) return;
     onSelect(selected);
-  }, [selected, onSelect]);
+  }, [devices, selected, onSelect]);
 
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const sinkId = e.target.value;

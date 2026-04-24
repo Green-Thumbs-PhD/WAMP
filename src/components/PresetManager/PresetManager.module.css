@@ -1,61 +1,125 @@
 .container {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
   position: relative;
+  width: min(100%, 1080px);
 }
 
 .filterRow,
-.metaRow {
+.metaRow,
+.actionRow,
+.toggleRow,
+.sceneButtons,
+.footswitchRow,
+.recentRow {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
   gap: 8px;
-  width: 100%;
 }
 
-.select {
+.filterRow,
+.metaRow,
+.recentRow,
+.actionRow,
+.toggleRow,
+.footswitchRow {
+  justify-content: center;
+}
+
+.recentRow {
+  min-height: 2rem;
+}
+
+.recentEmpty,
+.emptyState {
+  color: var(--theme-card-muted);
+  font-size: 0.74rem;
+}
+
+.select,
+.filterSelect,
+.input,
+.textarea,
+.trackSelect {
   background: var(--theme-card-bg);
   color: var(--theme-card-text);
   border: 1px solid var(--theme-card-border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  outline: none;
+}
+
+.select {
   border-radius: 999px;
   padding: 10px 16px;
   font-size: 0.82rem;
   cursor: pointer;
-  min-width: 200px;
-  outline: none;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  min-width: 220px;
 }
 
-.filterSelect {
-  background: var(--theme-card-bg);
-  color: var(--theme-card-text);
-  border: 1px solid var(--theme-card-border);
-  border-radius: 999px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  min-width: 130px;
+.filterSelect,
+.input {
+  border-radius: 10px;
+  min-width: 140px;
   padding: 8px 12px;
   font-size: 0.74rem;
-  outline: none;
+}
+
+.inputWide {
+  min-width: 220px;
+}
+
+.textarea {
+  border-radius: 12px;
+  min-height: 88px;
+  resize: vertical;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 0.74rem;
+  width: 100%;
+}
+
+.select:focus,
+.filterSelect:focus,
+.input:focus,
+.textarea:focus {
+  border-color: var(--theme-card-active);
 }
 
 .filterBtn,
-.favoriteBtn {
+.favoriteBtn,
+.btn,
+.recentBtn,
+.sceneRecall {
   background: color-mix(in srgb, var(--theme-card-active) 10%, #1b1611);
   color: var(--theme-card-text);
   border: 1px solid var(--theme-card-border);
   border-radius: 999px;
-  padding: 7px 12px;
-  font-size: 0.7rem;
-  letter-spacing: 0.05em;
   cursor: pointer;
 }
 
+.filterBtn,
+.favoriteBtn,
+.recentBtn,
+.sceneRecall {
+  padding: 7px 12px;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+}
+
+.btn {
+  padding: 9px 14px;
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
 .filterBtnActive,
-.favoriteBtnActive {
+.favoriteBtnActive,
+.sceneItemActive {
   background: color-mix(in srgb, var(--theme-card-active) 24%, #201913);
   border-color: var(--theme-card-active);
 }
@@ -77,68 +141,94 @@
   color: var(--theme-card-muted);
 }
 
-.select:focus {
-  border-color: var(--theme-card-active);
-}
-
-.btn {
-  background: color-mix(in srgb, var(--theme-card-active) 10%, #1b1611);
-  color: var(--theme-card-text);
+.editorCard,
+.saveDialog,
+.cueCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  background: var(--theme-card-bg);
   border: 1px solid var(--theme-card-border);
-  border-radius: 999px;
-  padding: 9px 14px;
-  font-size: 0.74rem;
-  letter-spacing: 0.08em;
+  border-radius: 14px;
+}
+
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  cursor: pointer;
-  white-space: nowrap;
+  color: var(--theme-card-text);
 }
 
-.btn:hover {
-  background: color-mix(in srgb, var(--theme-card-active) 18%, #201913);
+.sectionCopy {
+  margin: 0.25rem 0 0;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: var(--theme-card-muted);
 }
 
-.btn:disabled {
-  opacity: 0.4;
-  cursor: default;
+.editorGrid,
+.sceneList {
+  display: grid;
+  gap: 8px;
+}
+
+.editorGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.sceneItem {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(160px, 1fr) minmax(160px, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid var(--theme-card-border);
+  background: color-mix(in srgb, var(--theme-card-active) 6%, #16110d);
+}
+
+.sceneRecall {
+  justify-self: start;
+}
+
+.toggleOption {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--theme-card-text);
+  font-size: 0.74rem;
+}
+
+.livePanicMuteBtn {
+  margin-left: 24px;
+  padding: 23.4px 36.4px;
+  font-size: 1.924rem;
 }
 
 .deleteBtn {
   color: var(--theme-danger);
 }
 
-.deleteBtn:hover {
-  background: color-mix(in srgb, var(--theme-danger) 20%, #2a1414);
+.hiddenInput {
+  display: none;
 }
 
-.saveDialog {
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  margin-top: 8px;
-  background: var(--theme-card-bg);
-  border: 1px solid var(--theme-card-border);
-  border-radius: 12px;
-  padding: 10px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-  z-index: 10;
-}
+@media (max-width: 960px) {
+  .editorGrid,
+  .sceneItem {
+    grid-template-columns: 1fr;
+  }
 
-.input {
-  background: color-mix(in srgb, var(--theme-card-active) 8%, #120f0c);
-  color: var(--theme-card-text);
-  border: 1px solid var(--theme-card-border);
-  border-radius: 8px;
-  padding: 6px 10px;
-  font-size: 12px;
-  outline: none;
-  width: 160px;
-}
-
-.input:focus {
-  border-color: var(--theme-card-active);
+  .sectionHeader {
+    flex-direction: column;
+  }
 }
