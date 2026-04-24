@@ -7,15 +7,15 @@
 
 .fieldLabel {
   font-size: 8px;
-  color: #888;
+  color: var(--theme-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .select {
-  background: #1a1a1a;
-  color: #ccc;
-  border: 1px solid #444;
+  background: color-mix(in srgb, var(--theme-card-active) 8%, #151515);
+  color: var(--theme-card-text);
+  border: 1px solid var(--theme-card-border);
   border-radius: 4px;
   padding: 6px 10px;
   font-size: 12px;
@@ -30,10 +30,10 @@
 }
 
 .select:focus {
-  border-color: #666;
+  border-color: var(--theme-card-active);
 }
 
 .select option {
   background: #1a1a1a;
-  color: #ccc;
+  color: var(--theme-card-text);
 }

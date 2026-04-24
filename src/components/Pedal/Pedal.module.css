@@ -12,7 +12,7 @@
   align-items: center;
   padding: 8px 6px 12px;
   gap: 8px;
-  border: 2px solid rgba(255, 255, 255, 0.1);
+  border: 2px solid color-mix(in srgb, var(--theme-card-active) 24%, rgba(255, 255, 255, 0.1));
   box-shadow:
     0 4px 12px rgba(0, 0, 0, 0.5),
     0 1px 0 rgba(255, 255, 255, 0.08) inset,
@@ -43,12 +43,20 @@
   filter: brightness(0.6) saturate(0.4);
 }
 
+.pedal.locked {
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.5),
+    0 0 0 2px color-mix(in srgb, var(--theme-card-active) 34%, transparent),
+    0 1px 0 rgba(255, 255, 255, 0.08) inset,
+    0 -2px 0 rgba(0, 0, 0, 0.3) inset;
+}
+
 .titleBar {
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 4px 8px;
+  padding: 4px 50px 4px 44px;
   cursor: grab;
   position: relative;
   background: rgba(0, 0, 0, 0.2);
@@ -60,19 +68,31 @@
   cursor: grabbing;
 }
 
+.titleBarLocked {
+  cursor: default;
+}
+
+.dragHandle {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  color: rgba(255, 255, 255, 0.58);
+}
+
 .title {
   font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 2px;
+  color: var(--theme-card-text);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 .removeBtn {
-  position: absolute;
-  right: 4px;
-  top: 50%;
-  transform: translateY(-50%);
   background: none;
   border: none;
   color: rgba(255, 255, 255, 0.3);
@@ -83,8 +103,39 @@
   line-height: 1;
 }
 
+.actionGroup {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  gap: 2px;
+}
+
+.actionBtn {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.45);
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 5px;
+  border-radius: 4px;
+  line-height: 1;
+}
+
+.actionBtn:hover:not(:disabled) {
+  color: #fff;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.actionBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 .removeBtn:hover {
-  color: #ff6666;
+  color: var(--theme-danger);
   background: rgba(0, 0, 0, 0.3);
 }
 

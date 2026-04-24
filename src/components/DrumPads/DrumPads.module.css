@@ -1,16 +1,33 @@
 .panel {
-  padding: 0.65rem 1rem;
-  background: #1a1a1a;
-  border: 1px solid #333;
-  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 20%),
+    linear-gradient(180deg, #24262a, #111316 65%, #0d0f11);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.55);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.padSection,
+.sequencerSection {
+  min-width: 0;
 }
 
 .title {
-  font-size: 0.7rem;
+  font-size: 0.78rem;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: #888;
-  margin: 0 0 0.5rem 0;
+  letter-spacing: 0.12em;
+  color: #f1dfbe;
+  margin: 0 0 0.6rem 0;
 }
 
 .toolbar {
@@ -26,7 +43,7 @@
   align-items: center;
   gap: 0.4rem;
   font-size: 0.8rem;
-  color: #aaa;
+  color: #b2b7bd;
 }
 
 .captureRow {
@@ -35,22 +52,28 @@
   align-items: center;
   gap: 0.5rem;
   font-size: 0.8rem;
-  color: #999;
+  color: #b2b7bd;
 }
 
 .btn {
   font: inherit;
   font-size: 0.8rem;
   padding: 0.35rem 0.65rem;
-  border-radius: 6px;
-  border: 1px solid #444;
-  background: #2a2a2a;
+  border-radius: 999px;
+  border: 1px solid #4b4d52;
+  background: linear-gradient(180deg, #34373c, #1c1e22);
   color: #ddd;
   cursor: pointer;
 }
 
 .btn:hover:not(:disabled) {
-  background: #333;
+  background: linear-gradient(180deg, #41454b, #22252a);
+}
+
+.btnActive {
+  border-color: #d0a95d;
+  color: #fff1c9;
+  background: linear-gradient(180deg, #69542c, #2d2413);
 }
 
 .btn:disabled {
@@ -62,19 +85,22 @@
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 0.4rem;
-  max-width: 280px;
+  max-width: 353px;
 }
 
 .pad {
   aspect-ratio: 1;
-  border-radius: 8px;
-  border: 2px solid #444;
-  background: linear-gradient(165deg, #3a3a3a, #252525);
+  border-radius: 10px;
+  border: 2px solid #4d5057;
+  background: linear-gradient(165deg, #4b4f57, #24272e);
   color: #ccc;
   font-size: 0.65rem;
   font-weight: 600;
   cursor: pointer;
   user-select: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 4px 10px rgba(0, 0, 0, 0.22);
 }
 
 .pad:hover {
@@ -93,5 +119,197 @@
 .hint {
   margin-top: 0.5rem;
   font-size: 0.65rem;
-  color: #555;
+  color: #8e949c;
+}
+
+.kitRow {
+  margin-top: 0.5rem;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.kitLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.7rem;
+  color: #b2b7bd;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.kitSelect {
+  border: 1px solid #4b4d52;
+  border-radius: 8px;
+  background: #16181c;
+  color: #ddd;
+  font: inherit;
+  font-size: 0.66rem;
+  padding: 0.3rem 0.45rem;
+  min-width: 8.5rem;
+}
+
+.sequencerSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding-left: 0.25rem;
+}
+
+.sequencerHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.8rem;
+}
+
+.sequencerTitle {
+  margin: 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #f1dfbe;
+}
+
+.sequencerCopy {
+  margin: 0.2rem 0 0;
+  font-size: 0.66rem;
+  color: #8e949c;
+}
+
+.sequencerControls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.bpmControl {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.7rem;
+  color: #b2b7bd;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.bpmInput {
+  width: 4rem;
+  padding: 0.28rem 0.45rem;
+  border-radius: 8px;
+  border: 1px solid #4b4d52;
+  background: #16181c;
+  color: #ddd;
+  font: inherit;
+}
+
+.stepLabels {
+  display: grid;
+  grid-template-columns: 8rem repeat(16, minmax(0, 1fr));
+  gap: 0.26rem;
+  align-items: center;
+}
+
+.stepLabel {
+  text-align: center;
+  font-size: 0.56rem;
+  color: #707781;
+}
+
+.stepLabelActive {
+  color: #e0c44d;
+}
+
+.sequencerGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.sequenceRow {
+  display: grid;
+  grid-template-columns: 8rem repeat(16, minmax(0, 1fr));
+  gap: 0.26rem;
+  align-items: center;
+}
+
+.trackControl {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.trackLabel {
+  padding: 0.38rem 0.4rem;
+  border-radius: 8px;
+  border: 1px solid #4b4d52;
+  background: linear-gradient(180deg, #34373c, #1c1e22);
+  color: #d9dde2;
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+.trackLabel:hover {
+  border-color: #5a8fc4;
+}
+
+.trackSelect {
+  width: 100%;
+  padding: 0.28rem 0.38rem;
+  border-radius: 8px;
+  border: 1px solid #4b4d52;
+  background: #16181c;
+  color: #ddd;
+  font: inherit;
+  font-size: 0.62rem;
+}
+
+.hiddenInput {
+  display: none;
+}
+
+.stepBtn {
+  aspect-ratio: 1 / 1;
+  min-height: 1.2rem;
+  border-radius: 6px;
+  border: 1px solid #3f4248;
+  background: linear-gradient(180deg, #1c2026, #121418);
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease, transform 0.12s ease;
+}
+
+.stepBtn:hover {
+  border-color: #5a8fc4;
+}
+
+.stepBtnActive {
+  background: linear-gradient(180deg, #e0c44d, #8a7021);
+  border-color: #f4d26d;
+}
+
+.stepBtnCurrent {
+  box-shadow: 0 0 0 1px rgba(90, 143, 196, 0.7);
+}
+
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .sequencerSection {
+    padding-left: 0;
+  }
+
+  .stepLabels,
+  .sequenceRow {
+    grid-template-columns: 7rem repeat(16, minmax(0, 1fr));
+  }
 }

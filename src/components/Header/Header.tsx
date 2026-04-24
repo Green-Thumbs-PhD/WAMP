@@ -1,14 +1,13 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import styles from './Header.module.css';
 import { Knob } from '../Knob/Knob';
 import { LevelMeter } from '../LevelMeter/LevelMeter';
 import { InputSelector } from '../InputSelector/InputSelector';
 import { OutputSelector } from '../OutputSelector/OutputSelector';
-import { PresetManager } from '../PresetManager/PresetManager';
+import { MidiMapper } from '../MidiMapper/MidiMapper';
 import { useAudioEngineContext } from '../../context/AudioEngineContext';
-import { usePresets } from '../../hooks/usePresets';
+import type { RigSnapshot } from '../../types/presets';
 import type { ParamDescriptor } from '../../types/effects';
-import type { Preset, PresetEffectSlot } from '../../types/presets';
 
 const masterVolumeDescriptor: ParamDescriptor = {
   name: 'master',
@@ -20,77 +19,97 @@ const masterVolumeDescriptor: ParamDescriptor = {
   unit: '%',
 };
 
-export function Header() {
+const inputTrimDescriptor: ParamDescriptor = {
+  name: 'inputTrim',
+  label: 'Input Trim',
+  min: 0,
+  max: 200,
+  default: 100,
+  step: 1,
+  unit: '%',
+};
+
+interface HeaderProps {
+  onStart: () => void | Promise<void>;
+  onInputSelect: (deviceId: string) => void;
+  onOutputSelect: (sinkId: string) => void;
+  compareSlots: { A: RigSnapshot | null; B: RigSnapshot | null; active: 'A' | 'B' | null };
+  onCaptureCompare: (slot: 'A' | 'B') => void;
+  onRecallCompare: (slot: 'A' | 'B') => void;
+}
+
+export function Header({
+  onStart,
+  onInputSelect,
+  onOutputSelect,
+  compareSlots,
+  onCaptureCompare,
+  onRecallCompare,
+}: HeaderProps) {
   const {
     isRunning,
-    start,
     stop,
     masterVolume,
+    inputTrim,
+    inputMuted,
+    muted,
     setMasterVolume,
+    setInputTrim,
+    setInputMuted,
+    setMuted,
     inputLevel,
     outputLevel,
-    switchInput,
-    switchOutput,
-    loadPresetChain,
-    chain,
+    metronomeRunning,
+    metronomeStart,
+    metronomeStop,
+    applyTapTempoToEffects,
+    looperStatus,
+    looperStartRecord,
+    looperStopRecord,
+    looperPlay,
+    looperStop,
   } = useAudioEngineContext();
+  const tapTimesRef = useRef<number[]>([]);
+  const [audioScanToken, setAudioScanToken] = useState(0);
 
-  const { presets, activePresetId, savePreset, deletePreset, selectPreset } = usePresets();
+  const handleTapTempo = useCallback(() => {
+    const now = performance.now();
+    const taps = tapTimesRef.current.filter((time) => now - time < 2000);
+    taps.push(now);
+    tapTimesRef.current = taps;
+    if (taps.length < 2) return;
+    const deltas: number[] = [];
+    for (let i = 1; i < taps.length; i++) {
+      deltas.push(taps[i]! - taps[i - 1]!);
+    }
+    const avg = deltas.reduce((sum, value) => sum + value, 0) / deltas.length;
+    if (avg >= 120 && avg <= 3000) {
+      applyTapTempoToEffects(Math.round(60000 / avg));
+    }
+  }, [applyTapTempoToEffects]);
 
-  const pendingInputIdRef = useRef<string | undefined>(undefined);
-  const pendingOutputIdRef = useRef('');
-  const pendingPresetChainRef = useRef<PresetEffectSlot[] | undefined>(undefined);
+  const handleLooperRecordToggle = useCallback(() => {
+    if (looperStatus === 'recording') {
+      void looperStopRecord();
+      return;
+    }
+    if (looperStatus !== 'playing') {
+      looperStartRecord();
+    }
+  }, [looperStartRecord, looperStatus, looperStopRecord]);
 
-  const handleInputSelect = useCallback(
-    (deviceId: string) => {
-      if (!deviceId) return;
-      pendingInputIdRef.current = deviceId;
-      if (isRunning) void switchInput(deviceId);
-    },
-    [isRunning, switchInput]
-  );
-
-  const handleOutputSelect = useCallback(
-    (sinkId: string) => {
-      pendingOutputIdRef.current = sinkId;
-      if (isRunning && sinkId) void switchOutput(sinkId);
-    },
-    [isRunning, switchOutput]
-  );
-
-  const runStart = useCallback(async () => {
-    await start(pendingInputIdRef.current, pendingPresetChainRef.current);
-    pendingPresetChainRef.current = undefined;
-    const out = pendingOutputIdRef.current;
-    if (out) await switchOutput(out);
-  }, [start, switchOutput]);
-
-  const handleLoadPreset = useCallback(
-    (preset: Preset) => {
-      selectPreset(preset.id);
-      loadPresetChain(preset.chain as Parameters<typeof loadPresetChain>[0]);
-    },
-    [selectPreset, loadPresetChain]
-  );
-
-  const handleIdlePresetPick = useCallback(
-    (preset: Preset) => {
-      selectPreset(preset.id);
-      pendingPresetChainRef.current = preset.chain;
-    },
-    [selectPreset]
-  );
-
-  const handleSavePreset = useCallback(
-    (name: string) => {
-      savePreset(name, chain);
-    },
-    [savePreset, chain]
-  );
+  const handleLooperPlayToggle = useCallback(() => {
+    if (looperStatus === 'playing') {
+      looperStop();
+      return;
+    }
+    if (looperStatus === 'ready') {
+      looperPlay();
+    }
+  }, [looperPlay, looperStatus, looperStop]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.code !== 'Space') return;
       const t = e.target as HTMLElement;
       if (
         t.tagName === 'INPUT' ||
@@ -102,62 +121,182 @@ export function Header() {
       ) {
         return;
       }
-      e.preventDefault();
-      if (isRunning) stop();
-      else void runStart();
+
+      if (e.code === 'Space') {
+        e.preventDefault();
+        if (isRunning) stop();
+        else void onStart();
+        return;
+      }
+
+      if (!isRunning) return;
+
+      if (e.code === 'KeyM') {
+        e.preventDefault();
+        if (metronomeRunning) metronomeStop();
+        else metronomeStart();
+        return;
+      }
+
+      if (e.code === 'KeyT') {
+        e.preventDefault();
+        handleTapTempo();
+        return;
+      }
+
+      if (e.code === 'KeyR') {
+        e.preventDefault();
+        handleLooperRecordToggle();
+        return;
+      }
+
+      if (e.code === 'KeyP') {
+        e.preventDefault();
+        handleLooperPlayToggle();
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [isRunning, stop, runStart]);
+  }, [
+    handleLooperPlayToggle,
+    handleLooperRecordToggle,
+    handleTapTempo,
+    isRunning,
+    metronomeRunning,
+    metronomeStart,
+    metronomeStop,
+    onStart,
+    stop,
+  ]);
 
   return (
     <header className={styles.header}>
-      <div className={styles.left}>
-        <h1 className={styles.logo}>Mac2</h1>
+      <div className={styles.brandRow}>
+        <h1 className={styles.logo}>WAMP</h1>
         <div className={styles.powerSection}>
           {isRunning ? (
             <button type="button" className={`${styles.powerBtn} ${styles.on}`} onClick={stop}>
               <span className={styles.powerDot} /> ON
             </button>
           ) : (
-            <button type="button" className={`${styles.powerBtn} ${styles.off}`} onClick={() => void runStart()}>
+            <button type="button" className={`${styles.powerBtn} ${styles.off}`} onClick={() => void onStart()}>
               <span className={styles.powerDot} /> START
             </button>
           )}
         </div>
-        <div className={styles.ioStack}>
-          <InputSelector onSelect={handleInputSelect} disabled={false} />
-          <OutputSelector onSelect={handleOutputSelect} disabled={false} />
+      </div>
+
+      <div className={styles.controlsRow}>
+        <div className={styles.left}>
+        <div className={styles.midiSection}>
+          <MidiMapper
+            isRunning={isRunning}
+            muted={muted}
+            masterVolume={masterVolume}
+            inputTrim={inputTrim}
+            metronomeRunning={metronomeRunning}
+            looperStatus={looperStatus}
+            compareAReady={Boolean(compareSlots.A)}
+            compareBReady={Boolean(compareSlots.B)}
+            onStart={onStart}
+            onStop={stop}
+            onToggleMute={() => setMuted(!muted)}
+            onSetMasterVolume={setMasterVolume}
+            onSetInputTrim={setInputTrim}
+            onMetronomeToggle={() => {
+              if (metronomeRunning) metronomeStop();
+              else metronomeStart();
+            }}
+            onTapTempo={handleTapTempo}
+            onLooperRecordToggle={handleLooperRecordToggle}
+            onLooperPlayToggle={handleLooperPlayToggle}
+            onRecallCompare={onRecallCompare}
+          />
         </div>
-      </div>
+        <div className={styles.ioStack}>
+          <button
+            type="button"
+            className={styles.scanBtn}
+            onClick={() => setAudioScanToken((current) => current + 1)}
+          >
+            Scan Audio Connections
+          </button>
+          <div className={styles.selectorRow}>
+            <InputSelector onSelect={onInputSelect} disabled={false} refreshToken={audioScanToken} />
+            <button
+              type="button"
+              className={`${styles.utilityBtn} ${inputMuted ? styles.utilityBtnActive : ''}`}
+              onClick={() => setInputMuted(!inputMuted)}
+              aria-pressed={inputMuted}
+            >
+              Mute MIC
+            </button>
+          </div>
+          <div className={styles.selectorRow}>
+            <OutputSelector onSelect={onOutputSelect} disabled={false} refreshToken={audioScanToken} />
+            <button
+              type="button"
+              className={`${styles.utilityBtn} ${muted ? styles.utilityBtnActive : ''}`}
+              onClick={() => setMuted(!muted)}
+              aria-pressed={muted}
+            >
+              Mute ALL
+            </button>
+          </div>
+        </div>
+        </div>
 
-      <div className={styles.center}>
-        <PresetManager
-          presets={presets}
-          activePresetId={activePresetId}
-          onLoad={handleLoadPreset}
-          onSave={handleSavePreset}
-          onDelete={deletePreset}
-          isEngineRunning={isRunning}
-          onIdlePresetPick={handleIdlePresetPick}
-        />
-      </div>
-
-      <div className={styles.right}>
-        {isRunning && (
-          <>
-            <LevelMeter level={inputLevel} label="IN" />
-            <LevelMeter level={outputLevel} label="OUT" color="#4da6e0" />
-            <Knob
-              descriptor={masterVolumeDescriptor}
-              value={masterVolume * 100}
-              onChange={(v) => setMasterVolume(v / 100)}
-              color="#e0c44d"
-              size={44}
-              ariaLabel="Master output level"
-            />
-          </>
-        )}
+        <div className={styles.right}>
+          {isRunning && (
+            <>
+              <LevelMeter level={inputLevel} label="IN" />
+              <LevelMeter level={outputLevel} label="OUT" color="#4da6e0" />
+              <Knob
+                descriptor={inputTrimDescriptor}
+                value={inputTrim * 100}
+                onChange={(v) => setInputTrim(v / 100)}
+                color="#8fd3ff"
+                size={44}
+                ariaLabel="Input trim"
+              />
+              <Knob
+                descriptor={masterVolumeDescriptor}
+                value={masterVolume * 100}
+                onChange={(v) => setMasterVolume(v / 100)}
+                color="#e0c44d"
+                size={44}
+                ariaLabel="Master output level"
+              />
+              <div className={styles.compareSection}>
+                <div className={styles.compareLabel}>Preset A/B</div>
+                <div className={styles.compareButtons}>
+                  <button type="button" className={styles.compareStore} onClick={() => onCaptureCompare('A')}>
+                    Store A
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.compareToggle} ${compareSlots.active === 'A' ? styles.compareToggleActive : ''}`}
+                    onClick={() => onRecallCompare('A')}
+                    disabled={!compareSlots.A}
+                  >
+                    A
+                  </button>
+                  <button type="button" className={styles.compareStore} onClick={() => onCaptureCompare('B')}>
+                    Store B
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.compareToggle} ${compareSlots.active === 'B' ? styles.compareToggleActive : ''}`}
+                    onClick={() => onRecallCompare('B')}
+                    disabled={!compareSlots.B}
+                  >
+                    B
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </header>
   );

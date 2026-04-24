@@ -1,0 +1,119 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  min-width: 19rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.kicker {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--theme-card-muted);
+}
+
+.toggle,
+.actionBtn,
+.clearBtn {
+  font: inherit;
+  border-radius: 999px;
+  border: 1px solid var(--theme-slot-border);
+  background: color-mix(in srgb, var(--theme-card-muted) 18%, #232323);
+  color: var(--theme-card-text);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.toggle {
+  padding: 0.34rem 0.62rem;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.toggleActive,
+.learnActive {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--theme-card-active) 40%, #2b4736), #17241d);
+  border-color: var(--theme-card-active);
+  color: #f4ffec;
+}
+
+.inputRow {
+  display: flex;
+}
+
+.inputLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.72rem;
+  color: var(--theme-card-muted);
+}
+
+.select {
+  min-width: 10rem;
+  padding: 0.35rem 0.55rem;
+  border-radius: 10px;
+  border: 1px solid var(--theme-slot-border);
+  background: rgba(11, 12, 15, 0.9);
+  color: var(--theme-card-text);
+  font: inherit;
+}
+
+.grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: 13rem;
+  overflow: auto;
+}
+
+.mappingRow {
+  display: grid;
+  grid-template-columns: 6rem minmax(0, 1fr) auto auto;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.target {
+  font-size: 0.7rem;
+  color: var(--theme-card-text);
+}
+
+.binding {
+  min-width: 0;
+  font-size: 0.67rem;
+  color: var(--theme-card-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.actionBtn,
+.clearBtn {
+  padding: 0.28rem 0.5rem;
+  font-size: 0.66rem;
+}
+
+.clearBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.status,
+.note {
+  margin: 0;
+  font-size: 0.68rem;
+  color: var(--theme-card-muted);
+}

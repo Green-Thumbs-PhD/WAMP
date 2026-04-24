@@ -7,12 +7,12 @@
 
 .canvas {
   border-radius: 2px;
-  border: 1px solid #333;
+  border: 1px solid color-mix(in srgb, var(--theme-card-border) 60%, #333);
 }
 
 .label {
   font-size: 8px;
-  color: #888;
+  color: var(--theme-card-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }

@@ -14,10 +14,22 @@ interface PedalProps {
 }
 
 export function Pedal({ slot }: PedalProps) {
-  const { setEffectParam, toggleBypass, removeEffect } = useAudioEngineContext();
+  const {
+    setEffectParam,
+    toggleBypass,
+    removeEffect,
+    duplicateEffect,
+    copyEffectSettings,
+    pasteEffectSettings,
+    hasCopiedEffectSettings,
+    toggleLockedEffect,
+    isEffectLocked,
+  } = useAudioEngineContext();
   const colors = PEDAL_COLORS[slot.type];
   const descriptors = getParamDescriptors(slot.type);
   const isActive = !slot.bypassed;
+  const canPaste = hasCopiedEffectSettings(slot.type);
+  const isLocked = isEffectLocked(slot.id);
 
   const {
     attributes,
@@ -28,6 +40,7 @@ export function Pedal({ slot }: PedalProps) {
     isDragging,
   } = useSortable({
     id: slot.id,
+    disabled: isLocked,
   });
 
   const style = {
@@ -37,30 +50,76 @@ export function Pedal({ slot }: PedalProps) {
   };
 
   return (
-    <div ref={setNodeRef} style={style} className={styles.wrapper}>
+    <div ref={setNodeRef} style={style} className={styles.wrapper} id={`pedal-${slot.id}`}>
       <div
-        className={`${styles.pedal} ${isActive ? styles.active : styles.bypassed}`}
+        className={`${styles.pedal} ${isActive ? styles.active : styles.bypassed} ${isLocked ? styles.locked : ''}`}
         style={{ background: colors.bg }}
       >
         {/* Drag handle + title bar */}
         <div
-          className={styles.titleBar}
+          className={`${styles.titleBar} ${isLocked ? styles.titleBarLocked : ''}`}
           {...attributes}
           {...listeners}
         >
+          <span className={styles.dragHandle} aria-hidden="true">
+            {isLocked ? 'LOCK' : 'DRAG'}
+          </span>
           <span className={styles.title} style={{ color: colors.text }}>
             {EFFECT_LABELS[slot.type]}
           </span>
-          <button
-            className={styles.removeBtn}
-            onClick={(e) => {
-              e.stopPropagation();
-              removeEffect(slot.id);
-            }}
-            title="Remove"
-          >
-            x
-          </button>
+          <div className={styles.actionGroup}>
+            <button
+              className={styles.actionBtn}
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleLockedEffect(slot.id);
+              }}
+              title={isLocked ? 'Unlock pedal position' : 'Lock pedal position'}
+            >
+              {isLocked ? 'U' : 'L'}
+            </button>
+            <button
+              className={styles.actionBtn}
+              onClick={(e) => {
+                e.stopPropagation();
+                duplicateEffect(slot.id);
+              }}
+              title="Duplicate pedal"
+            >
+              D
+            </button>
+            <button
+              className={styles.actionBtn}
+              onClick={(e) => {
+                e.stopPropagation();
+                copyEffectSettings(slot.id);
+              }}
+              title="Copy pedal settings"
+            >
+              C
+            </button>
+            <button
+              className={styles.actionBtn}
+              onClick={(e) => {
+                e.stopPropagation();
+                void pasteEffectSettings(slot.id);
+              }}
+              title={canPaste ? 'Paste copied settings' : 'Copy settings from a matching pedal first'}
+              disabled={!canPaste}
+            >
+              P
+            </button>
+            <button
+              className={styles.removeBtn}
+              onClick={(e) => {
+                e.stopPropagation();
+                removeEffect(slot.id);
+              }}
+              title="Remove"
+            >
+              x
+            </button>
+          </div>
         </div>
 
         {/* LED */}

@@ -1,0 +1,184 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 20%),
+    linear-gradient(180deg, #24262a, #111316 65%, #0d0f11);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.55);
+}
+
+.title {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: #d0a95d;
+  margin: 0;
+}
+
+.meta,
+.statusRow,
+.mixRow {
+  font-size: 0.78rem;
+  color: #b2b7bd;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.library {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.libraryHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #d0a95d;
+}
+
+.emptyState {
+  font-size: 0.78rem;
+  color: #9ea5ad;
+}
+
+.libraryList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  max-height: 11.5rem;
+  overflow: auto;
+}
+
+.libraryItem {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.55rem 0.65rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.libraryItemActive {
+  border-color: rgba(208, 169, 93, 0.45);
+  box-shadow: inset 0 0 0 1px rgba(208, 169, 93, 0.16);
+}
+
+.libraryMeta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.libraryMeta strong {
+  font-size: 0.82rem;
+  color: #f1f3f5;
+}
+
+.libraryMeta span {
+  font-size: 0.72rem;
+  color: #aab1b9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.libraryActions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.listBtn {
+  font: inherit;
+  font-size: 0.72rem;
+  padding: 0.28rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid #4b4d52;
+  background: linear-gradient(180deg, #34373c, #1c1e22);
+  color: #ddd;
+  cursor: pointer;
+}
+
+.deleteBtn {
+  color: #f2aaaa;
+}
+
+.btn {
+  font: inherit;
+  font-size: 0.8rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid #4b4d52;
+  background: linear-gradient(180deg, #34373c, #1c1e22);
+  color: #ddd;
+  cursor: pointer;
+}
+
+.btn:hover:not(:disabled) {
+  background: linear-gradient(180deg, #41454b, #22252a);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.clearBtn {
+  color: #f2aaaa;
+}
+
+.mixRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.mixRow input {
+  flex: 1;
+}
+
+.statusRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 1.25rem;
+}
+
+.statusLed {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 50%;
+  background: #555;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.statusLed[data-active='true'] {
+  background: #63d672;
+  box-shadow: 0 0 10px rgba(99, 214, 114, 0.5);
+}
+
+.hiddenInput {
+  display: none;
+}

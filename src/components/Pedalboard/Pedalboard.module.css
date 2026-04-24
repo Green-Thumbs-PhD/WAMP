@@ -1,33 +1,215 @@
 .board {
-  flex: 1;
+  overflow: hidden;
+  padding: 16px;
+  border-radius: 28px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(0, 0, 0, 0.18)),
+    var(--theme-rack-bg);
+  border: 1px solid var(--theme-rack-border);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 -8px 20px rgba(0, 0, 0, 0.38),
+    0 22px 44px rgba(0, 0, 0, 0.35);
+}
+
+.caseHeader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.caseBadge {
+  color: var(--theme-card-text);
+  font-family: var(--theme-font-display);
+  font-size: clamp(1.8rem, 4vw, 3rem);
+  font-style: italic;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: center;
+  text-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.5),
+    0 0 18px color-mix(in srgb, var(--theme-card-active) 26%, transparent);
+}
+
+.controlPanel {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.miniMap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-bottom: 0.9rem;
+  padding: 0.85rem 1rem;
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.miniMapHeader {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.miniMapTitle {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--theme-card-text);
+}
+
+.miniMapHint {
+  font-size: 0.72rem;
+  color: var(--theme-card-muted);
+}
+
+.miniMapRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.miniMapItem {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--theme-card-text);
+  cursor: pointer;
+  text-transform: uppercase;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+}
+
+.miniMapItemLocked {
+  border-color: color-mix(in srgb, var(--theme-card-active) 48%, transparent);
+}
+
+.miniMapItemBypassed {
+  opacity: 0.55;
+}
+
+.miniMapIndex {
+  color: var(--theme-card-active);
+  font-weight: 700;
+}
+
+.miniMapLabel {
+  max-width: 7rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tipBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.9rem;
+}
+
+.tipChip {
+  padding: 0.42rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  color: var(--theme-card-muted);
+  font-size: 0.72rem;
+}
+
+.deck {
   overflow-x: auto;
   overflow-y: hidden;
-  padding: 24px;
+  padding: 18px;
+  border-radius: 18px;
   background:
-    radial-gradient(ellipse at center, rgba(40, 35, 30, 0.8) 0%, rgba(15, 12, 10, 0.95) 100%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 12%),
     repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 2px,
-      rgba(60, 50, 40, 0.15) 2px,
-      rgba(60, 50, 40, 0.15) 4px
-    );
-  background-color: #1a1510;
-  border-top: 1px solid #333;
-  border-bottom: 1px solid #333;
+      90deg,
+      rgba(0, 0, 0, 0.14),
+      rgba(0, 0, 0, 0.14) 3px,
+      rgba(255, 255, 255, 0.015) 3px,
+      rgba(255, 255, 255, 0.015) 22px
+    ),
+    color-mix(in srgb, var(--theme-card-active) 8%, #18110d);
+  border: 2px solid color-mix(in srgb, var(--theme-card-active) 28%, #3f2d20);
+  box-shadow:
+    inset 0 0 0 4px rgba(18, 12, 8, 0.85),
+    inset 0 14px 22px rgba(255, 255, 255, 0.02),
+    inset 0 -14px 18px rgba(0, 0, 0, 0.3);
 }
 
 .chain {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 22px;
   min-height: 320px;
-  padding: 8px 0;
+  padding: 10px 4px;
 }
 
 .empty {
-  color: #555;
+  color: var(--theme-muted);
   font-size: 14px;
   padding: 0 20px;
-  white-space: nowrap;
+}
+
+.emptyCard {
+  max-width: 28rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.1rem 1.2rem;
+  border-radius: 18px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px dashed color-mix(in srgb, var(--theme-card-active) 36%, rgba(255, 255, 255, 0.1));
+}
+
+.emptyTitle {
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--theme-card-text);
+}
+
+.emptyCopy {
+  margin: 0;
+  color: var(--theme-card-muted);
+  line-height: 1.5;
+}
+
+.emptyActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.emptyAction {
+  padding: 0.38rem 0.68rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--theme-card-text);
+  font-size: 0.72rem;
+}
+
+@media (max-width: 640px) {
+  .board {
+    padding: 12px;
+    border-radius: 22px;
+  }
+
+  .deck {
+    padding: 14px;
+  }
+
+  .chain {
+    min-height: 280px;
+    gap: 16px;
+  }
 }

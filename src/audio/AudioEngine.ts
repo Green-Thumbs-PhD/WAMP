@@ -1,8 +1,10 @@
 import type { EffectNode, EffectType, EffectSlotState } from '../types/effects';
+import type { PitchAnalysis } from '../types/tuner';
 import { createEffect } from './effects';
-import { PostChainLooper, type LooperStatus } from './PostChainLooper';
+import { BackingTrackPlayer, type BackingTrackState } from './BackingTrackPlayer';
+import { PostChainLooper, type LooperState, type LooperStatus } from './PostChainLooper';
 import { MetronomeEngine } from './MetronomeEngine';
-import { buildFactoryKit } from './DrumKit';
+import { buildFactoryKit, type DrumKitPresetId } from './DrumKit';
 
 export class AudioEngine {
   private ctx: AudioContext | null = null;
@@ -11,16 +13,45 @@ export class AudioEngine {
   private mixBus: GainNode | null = null;
   private padBus: GainNode | null = null;
   private padsThroughChain = false;
+  private globalNoiseGateGain: GainNode | null = null;
+  private globalNoiseGateDetector: ScriptProcessorNode | null = null;
+  private globalNoiseGateDetectorSink: GainNode | null = null;
   private inputGain: GainNode | null = null;
+  private ampInput: GainNode | null = null;
+  private ampDriveGain: GainNode | null = null;
+  private ampShaper: WaveShaperNode | null = null;
+  private ampPresenceFilter: BiquadFilterNode | null = null;
+  private ampLevelGain: GainNode | null = null;
   private outputGain: GainNode | null = null;
+  private cabinetInput: GainNode | null = null;
+  private cabinetDryGain: GainNode | null = null;
+  private cabinetWetGain: GainNode | null = null;
+  private cabinetConvolver: ConvolverNode | null = null;
   private inputAnalyser: AnalyserNode | null = null;
   private outputAnalyser: AnalyserNode | null = null;
   private effects: EffectNode[] = [];
   private masterVolume = 1;
+  private inputTrim = 1;
+  private inputMuted = false;
+  private muted = false;
+  private ampChannel: 'clean' | 'crunch' | 'lead' = 'clean';
+  private ampPresence = 55;
+  private ampLevel = 1;
+  private globalNoiseGateEnabled = false;
+  private globalNoiseGateThreshold = -56;
+  private globalNoiseGateRelease = 160;
+  private globalNoiseGateReduction = 100;
+  private globalNoiseGateValue = 1;
+  private cabinetIrEnabled = false;
+  private cabinetIrMix = 1;
+  private cabinetIrName = '';
 
   private looperGain: GainNode | null = null;
   private recordDest: MediaStreamAudioDestinationNode | null = null;
   private looper: PostChainLooper | null = null;
+  private backingTrack: BackingTrackPlayer | null = null;
+  private outputRecorder: MediaRecorder | null = null;
+  private outputRecorderChunks: Blob[] = [];
 
   private metronomeGain: GainNode | null = null;
   private metronome: MetronomeEngine | null = null;
@@ -55,8 +86,25 @@ export class AudioEngine {
     this.padBus.gain.value = 1;
 
     this.inputGain = this.ctx.createGain();
+    this.inputGain.gain.value = this.inputMuted ? 0 : this.inputTrim;
+    this.ampInput = this.ctx.createGain();
+    this.ampDriveGain = this.ctx.createGain();
+    this.ampShaper = this.ctx.createWaveShaper();
+    this.ampPresenceFilter = this.ctx.createBiquadFilter();
+    this.ampPresenceFilter.type = 'highshelf';
+    this.ampPresenceFilter.frequency.value = 2300;
+    this.ampLevelGain = this.ctx.createGain();
     this.outputGain = this.ctx.createGain();
-    this.outputGain.gain.value = this.masterVolume;
+    this.outputGain.gain.value = this.muted ? 0 : this.masterVolume;
+    this.cabinetInput = this.ctx.createGain();
+    this.cabinetDryGain = this.ctx.createGain();
+    this.cabinetWetGain = this.ctx.createGain();
+    this.cabinetConvolver = this.ctx.createConvolver();
+    this.globalNoiseGateGain = this.ctx.createGain();
+    this.globalNoiseGateGain.gain.value = 1;
+    this.globalNoiseGateDetector = this.ctx.createScriptProcessor(1024, 1, 1);
+    this.globalNoiseGateDetectorSink = this.ctx.createGain();
+    this.globalNoiseGateDetectorSink.gain.value = 0;
 
     this.inputAnalyser = this.ctx.createAnalyser();
     this.inputAnalyser.fftSize = 256;
@@ -67,14 +115,50 @@ export class AudioEngine {
     this.looperGain.gain.value = 0;
     this.recordDest = this.ctx.createMediaStreamDestination();
     this.looper = new PostChainLooper(this.ctx, this.looperGain, this.recordDest);
+    this.backingTrack = new BackingTrackPlayer(this.ctx, this.outputGain);
 
     this.metronomeGain = this.ctx.createGain();
     this.metronomeGain.gain.value = 0.9;
     this.metronome = new MetronomeEngine(this.ctx, this.metronomeGain);
 
-    this.sourceNode.connect(this.mixBus);
+    this.globalNoiseGateDetector.onaudioprocess = (event) => {
+      const input = event.inputBuffer.getChannelData(0);
+      if (!input.length || !this.globalNoiseGateGain) return;
+
+      if (!this.globalNoiseGateEnabled) {
+        this.globalNoiseGateValue = 1;
+        this.globalNoiseGateGain.gain.value = 1;
+        return;
+      }
+
+      let rms = 0;
+      for (let i = 0; i < input.length; i++) {
+        rms += input[i]! * input[i]!;
+      }
+      rms = Math.sqrt(rms / input.length);
+
+      const thresholdLinear = Math.pow(10, this.globalNoiseGateThreshold / 20);
+      const minOpen = 1 - this.globalNoiseGateReduction / 100;
+      const target = rms >= thresholdLinear ? 1 : minOpen;
+      const bufferDuration = input.length / this.ctx!.sampleRate;
+      const releaseSeconds = Math.max(0.02, this.globalNoiseGateRelease / 1000);
+      const coeff = Math.exp(-bufferDuration / releaseSeconds);
+
+      this.globalNoiseGateValue = target > this.globalNoiseGateValue
+        ? target
+        : target + (this.globalNoiseGateValue - target) * coeff;
+
+      this.globalNoiseGateGain.gain.value = this.globalNoiseGateValue;
+    };
+
+    this.sourceNode.connect(this.globalNoiseGateGain);
+    this.globalNoiseGateGain.connect(this.mixBus);
+    this.sourceNode.connect(this.globalNoiseGateDetector);
+    this.globalNoiseGateDetector.connect(this.globalNoiseGateDetectorSink);
+    this.globalNoiseGateDetectorSink.connect(this.ctx.destination);
     this.mixBus.connect(this.inputGain);
     this.inputGain.connect(this.inputAnalyser);
+    this.configureAmpVoicing();
 
     this.padBuffers = buildFactoryKit(this.ctx);
     this.applyPadRouting();
@@ -102,8 +186,15 @@ export class AudioEngine {
   }
 
   stop(): void {
+    if (this.outputRecorder?.state === 'recording') {
+      this.outputRecorder.stop();
+    }
+    this.outputRecorder = null;
+    this.outputRecorderChunks = [];
     this.looper?.dispose();
     this.looper = null;
+    this.backingTrack?.dispose();
+    this.backingTrack = null;
     this.metronome?.dispose();
     this.metronome = null;
 
@@ -116,7 +207,15 @@ export class AudioEngine {
     this.sourceNode = null;
     this.mixBus = null;
     this.padBus = null;
+    this.globalNoiseGateGain = null;
+    this.globalNoiseGateDetector = null;
+    this.globalNoiseGateDetectorSink = null;
     this.inputGain = null;
+    this.ampInput = null;
+    this.ampDriveGain = null;
+    this.ampShaper = null;
+    this.ampPresenceFilter = null;
+    this.ampLevelGain = null;
     this.outputGain = null;
     this.inputAnalyser = null;
     this.outputAnalyser = null;
@@ -124,6 +223,10 @@ export class AudioEngine {
     this.recordDest = null;
     this.metronomeGain = null;
     this.padBuffers = [];
+    this.cabinetInput = null;
+    this.cabinetDryGain = null;
+    this.cabinetWetGain = null;
+    this.cabinetConvolver = null;
   }
 
   isRunning(): boolean {
@@ -157,6 +260,42 @@ export class AudioEngine {
     return this.padsThroughChain;
   }
 
+  setGlobalNoiseGateEnabled(enabled: boolean): void {
+    this.globalNoiseGateEnabled = enabled;
+    if (!enabled && this.globalNoiseGateGain) {
+      this.globalNoiseGateValue = 1;
+      this.globalNoiseGateGain.gain.value = 1;
+    }
+  }
+
+  isGlobalNoiseGateEnabled(): boolean {
+    return this.globalNoiseGateEnabled;
+  }
+
+  setGlobalNoiseGateThreshold(value: number): void {
+    this.globalNoiseGateThreshold = value;
+  }
+
+  getGlobalNoiseGateThreshold(): number {
+    return this.globalNoiseGateThreshold;
+  }
+
+  setGlobalNoiseGateRelease(value: number): void {
+    this.globalNoiseGateRelease = value;
+  }
+
+  getGlobalNoiseGateRelease(): number {
+    return this.globalNoiseGateRelease;
+  }
+
+  setGlobalNoiseGateReduction(value: number): void {
+    this.globalNoiseGateReduction = value;
+  }
+
+  getGlobalNoiseGateReduction(): number {
+    return this.globalNoiseGateReduction;
+  }
+
   playDrumPad(index: number, velocity = 1): void {
     if (!this.ctx || !this.padBus) return;
     const buf = this.padBuffers[index];
@@ -173,6 +312,40 @@ export class AudioEngine {
       src.disconnect();
       g.disconnect();
     };
+  }
+
+  loadFactoryDrumKit(presetId: DrumKitPresetId): boolean {
+    if (!this.ctx) return false;
+    this.padBuffers = buildFactoryKit(this.ctx, presetId);
+    return true;
+  }
+
+  exportDrumPadKitSnapshot(): { padBuffers: { sampleRate: number; samples: number[] }[] } {
+    const padBuffers = this.padBuffers.map((buffer) => ({
+      sampleRate: buffer.sampleRate,
+      samples: Array.from(buffer.getChannelData(0)),
+    }));
+    return { padBuffers };
+  }
+
+  importDrumPadKitSnapshot(snapshot: { padBuffers: { sampleRate: number; samples: number[] }[] }): boolean {
+    if (!this.ctx || !Array.isArray(snapshot.padBuffers) || snapshot.padBuffers.length !== 16) return false;
+    const nextBuffers: AudioBuffer[] = [];
+    for (const entry of snapshot.padBuffers) {
+      if (!entry || !Array.isArray(entry.samples) || !Number.isFinite(entry.sampleRate) || entry.sampleRate <= 0) {
+        return false;
+      }
+      const length = entry.samples.length;
+      if (length < 1) return false;
+      const audioBuffer = this.ctx.createBuffer(1, length, entry.sampleRate);
+      const channelData = audioBuffer.getChannelData(0);
+      for (let i = 0; i < length; i++) {
+        channelData[i] = Math.max(-1, Math.min(1, Number(entry.samples[i] ?? 0)));
+      }
+      nextBuffers.push(audioBuffer);
+    }
+    this.padBuffers = nextBuffers;
+    return true;
   }
 
   async captureMicToPad(padIndex: number, durationMs = 1000): Promise<boolean> {
@@ -226,6 +399,10 @@ export class AudioEngine {
     await this.looper?.stopRecording();
   }
 
+  setLooperRecordLength(length: number): void {
+    this.looper?.setRecordLength(length);
+  }
+
   looperPlay(): void {
     this.looper?.play();
   }
@@ -242,12 +419,94 @@ export class AudioEngine {
     this.looper?.setLevel(level);
   }
 
+  setLooperTrimRange(start: number, end: number): void {
+    this.looper?.setTrimRange(start, end);
+  }
+
+  resetLooperTrim(): void {
+    this.looper?.resetTrim();
+  }
+
+  applyLooperTrim(): void {
+    this.looper?.applyTrim();
+  }
+
   getLooperStatus(): LooperStatus {
     return this.looper?.getStatus() ?? 'idle';
   }
 
   getLooperDuration(): number {
     return this.looper?.getLoopDuration() ?? 0;
+  }
+
+  getLooperState(): LooperState {
+    return this.looper?.getState() ?? {
+      status: 'idle',
+      sourceDuration: 0,
+      trimmedDuration: 0,
+      trimStart: 0,
+      trimEnd: 0,
+      currentTime: 0,
+      level: 0.85,
+      recordLength: 8,
+      peaks: [],
+    };
+  }
+
+  async loadBackingTrack(file: File): Promise<boolean> {
+    const arrayBuffer = await file.arrayBuffer();
+    return this.backingTrack?.loadFromArrayBuffer(arrayBuffer, file.name) ?? false;
+  }
+
+  playBackingTrack(): void {
+    this.backingTrack?.play();
+  }
+
+  pauseBackingTrack(): void {
+    this.backingTrack?.pause();
+  }
+
+  stopBackingTrack(): void {
+    this.backingTrack?.stop();
+  }
+
+  clearBackingTrack(): void {
+    this.backingTrack?.clear();
+  }
+
+  setBackingTrackVolume(value: number): void {
+    this.backingTrack?.setVolume(value);
+  }
+
+  seekBackingTrack(value: number): void {
+    this.backingTrack?.setCurrentTime(value);
+  }
+
+  setBackingTrackSection(start: number, end: number): void {
+    this.backingTrack?.setSection(start, end);
+  }
+
+  setBackingTrackSectionLoopEnabled(enabled: boolean): void {
+    this.backingTrack?.setSectionLoopEnabled(enabled);
+  }
+
+  setBackingTrackPlaybackRate(rate: number): void {
+    this.backingTrack?.setPlaybackRate(rate);
+  }
+
+  getBackingTrackState(): BackingTrackState {
+    return this.backingTrack?.getState() ?? {
+      name: '',
+      duration: 0,
+      currentTime: 0,
+      isPlaying: false,
+      volume: 0.8,
+      sectionStart: 0,
+      sectionEnd: 0,
+      sectionLoopEnabled: false,
+      playbackRate: 1,
+      peaks: [],
+    };
   }
 
   // --- Metronome ---
@@ -286,7 +545,21 @@ export class AudioEngine {
   }
 
   private rebuildChain(): void {
-    if (!this.ctx || !this.inputGain || !this.outputGain || !this.outputAnalyser) return;
+    if (
+      !this.ctx ||
+      !this.inputGain ||
+      !this.ampInput ||
+      !this.ampDriveGain ||
+      !this.ampShaper ||
+      !this.ampPresenceFilter ||
+      !this.ampLevelGain ||
+      !this.outputGain ||
+      !this.outputAnalyser ||
+      !this.cabinetInput ||
+      !this.cabinetDryGain ||
+      !this.cabinetWetGain ||
+      !this.cabinetConvolver
+    ) return;
 
     this.inputGain.disconnect(this.inputAnalyser!);
     this.inputGain.connect(this.inputAnalyser!);
@@ -306,27 +579,52 @@ export class AudioEngine {
       }
     }
     try {
+      this.ampInput.disconnect();
+      this.ampDriveGain.disconnect();
+      this.ampShaper.disconnect();
+      this.ampPresenceFilter.disconnect();
+      this.ampLevelGain.disconnect();
       this.outputGain.disconnect();
     } catch {
       /* ignore */
     }
+    try {
+      this.cabinetInput.disconnect();
+      this.cabinetDryGain.disconnect();
+      this.cabinetWetGain.disconnect();
+      this.cabinetConvolver.disconnect();
+    } catch {
+      /* ignore */
+    }
 
-    let prevOutput: AudioNode = this.inputGain;
+    this.inputGain.connect(this.ampInput);
+    this.ampInput.connect(this.ampDriveGain);
+    this.ampDriveGain.connect(this.ampShaper);
+    this.ampShaper.connect(this.ampPresenceFilter);
+    this.ampPresenceFilter.connect(this.ampLevelGain);
+
+    let prevOutput: AudioNode = this.ampLevelGain;
 
     for (const effect of this.effects) {
       prevOutput.connect(effect.getInputNode());
       prevOutput = effect.getOutputNode();
     }
 
-    prevOutput.connect(this.outputGain);
+    prevOutput.connect(this.cabinetInput);
+    this.cabinetInput.connect(this.cabinetDryGain);
+    this.cabinetInput.connect(this.cabinetConvolver);
+    this.cabinetConvolver.connect(this.cabinetWetGain);
+    this.cabinetDryGain.connect(this.outputGain);
+    this.cabinetWetGain.connect(this.outputGain);
+    this.updateCabinetMix();
 
     if (this.recordDest) {
       try {
-        prevOutput.disconnect(this.recordDest);
+        this.outputGain.disconnect(this.recordDest);
       } catch {
         /* ignore */
       }
-      prevOutput.connect(this.recordDest);
+      this.outputGain.connect(this.recordDest);
     }
 
     if (this.looperGain) {
@@ -351,6 +649,69 @@ export class AudioEngine {
 
     this.outputGain.connect(this.outputAnalyser);
     this.outputAnalyser.connect(this.ctx.destination);
+  }
+
+  private createDriveCurve(amount: number) {
+    const samples = 2048;
+    const curve = new Float32Array(new ArrayBuffer(samples * Float32Array.BYTES_PER_ELEMENT));
+    const drive = Math.max(1, amount);
+    for (let i = 0; i < samples; i++) {
+      const x = (i * 2) / (samples - 1) - 1;
+      curve[i] = Math.tanh(x * drive);
+    }
+    return curve;
+  }
+
+  private configureAmpVoicing(): void {
+    if (!this.ampDriveGain || !this.ampShaper || !this.ampPresenceFilter || !this.ampLevelGain) return;
+    const channelSettings = {
+      clean: { drive: 1.4, presenceOffset: -1.5, levelTrim: 1.02 },
+      crunch: { drive: 2.8, presenceOffset: 1.5, levelTrim: 0.96 },
+      lead: { drive: 4.2, presenceOffset: 3.5, levelTrim: 0.9 },
+    } as const;
+    const channel = channelSettings[this.ampChannel];
+    this.ampDriveGain.gain.value = channel.drive;
+    const shaper = this.ampShaper as WaveShaperNode & { curve: Float32Array<ArrayBufferLike> | null };
+    shaper.curve = this.createDriveCurve(channel.drive * 1.35);
+    this.ampShaper.oversample = '4x';
+    this.ampPresenceFilter.gain.value = channel.presenceOffset + (this.ampPresence - 50) * 0.18;
+    this.ampLevelGain.gain.value = this.ampLevel * channel.levelTrim;
+  }
+
+  setAmpChannel(channel: 'clean' | 'crunch' | 'lead'): void {
+    this.ampChannel = channel;
+    this.configureAmpVoicing();
+  }
+
+  getAmpChannel(): 'clean' | 'crunch' | 'lead' {
+    return this.ampChannel;
+  }
+
+  setAmpPresence(value: number): void {
+    this.ampPresence = value;
+    this.configureAmpVoicing();
+  }
+
+  getAmpPresence(): number {
+    return this.ampPresence;
+  }
+
+  setAmpLevel(value: number): void {
+    this.ampLevel = value;
+    this.configureAmpVoicing();
+  }
+
+  getAmpLevel(): number {
+    return this.ampLevel;
+  }
+
+  private updateCabinetMix(): void {
+    if (!this.cabinetDryGain || !this.cabinetWetGain) return;
+    const hasIr = Boolean(this.cabinetConvolver?.buffer);
+    const wet = this.cabinetIrEnabled && hasIr ? this.cabinetIrMix : 0;
+    const dry = this.cabinetIrEnabled && hasIr ? 1 - wet : 1;
+    this.cabinetDryGain.gain.value = dry;
+    this.cabinetWetGain.gain.value = wet;
   }
 
   addEffect(type: EffectType, params?: Record<string, number>): EffectNode {
@@ -381,6 +742,16 @@ export class AudioEngine {
     this.rebuildChain();
   }
 
+  setEffectOrder(ids: string[]): void {
+    const byId = new Map(this.effects.map((effect) => [effect.id, effect]));
+    const reordered = ids
+      .map((id) => byId.get(id))
+      .filter((effect): effect is EffectNode => Boolean(effect));
+    if (reordered.length !== this.effects.length) return;
+    this.effects = reordered;
+    this.rebuildChain();
+  }
+
   getEffects(): EffectNode[] {
     return [...this.effects];
   }
@@ -391,13 +762,106 @@ export class AudioEngine {
 
   setMasterVolume(value: number): void {
     this.masterVolume = value;
+    this.updateOutputGain();
+  }
+
+  private updateOutputGain(): void {
     if (this.outputGain) {
-      this.outputGain.gain.linearRampToValueAtTime(value, (this.ctx?.currentTime ?? 0) + 0.01);
+      const target = this.muted ? 0 : this.masterVolume;
+      this.outputGain.gain.linearRampToValueAtTime(target, (this.ctx?.currentTime ?? 0) + 0.01);
     }
   }
 
   getMasterVolume(): number {
     return this.masterVolume;
+  }
+
+  setInputTrim(value: number): void {
+    this.inputTrim = value;
+    this.updateInputGain();
+  }
+
+  getInputTrim(): number {
+    return this.inputTrim;
+  }
+
+  private updateInputGain(): void {
+    if (this.inputGain) {
+      const target = this.inputMuted ? 0 : this.inputTrim;
+      this.inputGain.gain.linearRampToValueAtTime(target, (this.ctx?.currentTime ?? 0) + 0.01);
+    }
+  }
+
+  setInputMuted(muted: boolean): void {
+    this.inputMuted = muted;
+    this.updateInputGain();
+  }
+
+  isInputMuted(): boolean {
+    return this.inputMuted;
+  }
+
+  setMuted(muted: boolean): void {
+    this.muted = muted;
+    this.updateOutputGain();
+  }
+
+  isMuted(): boolean {
+    return this.muted;
+  }
+
+  async loadCabinetIr(file: File): Promise<boolean> {
+    const arrayBuffer = await file.arrayBuffer();
+    return this.loadCabinetIrBuffer(arrayBuffer, file.name);
+  }
+
+  async loadCabinetIrBuffer(arrayBuffer: ArrayBuffer, name: string): Promise<boolean> {
+    if (!this.ctx || !this.cabinetConvolver) return false;
+    try {
+      const decoded = await this.ctx.decodeAudioData(arrayBuffer.slice(0));
+      this.cabinetConvolver.buffer = decoded;
+      this.cabinetIrName = name;
+      this.cabinetIrEnabled = true;
+      this.updateCabinetMix();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  clearCabinetIr(): void {
+    if (this.cabinetConvolver) {
+      this.cabinetConvolver.buffer = null;
+    }
+    this.cabinetIrName = '';
+    this.cabinetIrEnabled = false;
+    this.updateCabinetMix();
+  }
+
+  setCabinetIrEnabled(enabled: boolean): void {
+    this.cabinetIrEnabled = enabled;
+    this.updateCabinetMix();
+  }
+
+  isCabinetIrEnabled(): boolean {
+    return this.cabinetIrEnabled;
+  }
+
+  getCabinetIrName(): string {
+    return this.cabinetIrName;
+  }
+
+  hasCabinetIr(): boolean {
+    return Boolean(this.cabinetConvolver?.buffer);
+  }
+
+  setCabinetIrMix(mix: number): void {
+    this.cabinetIrMix = Math.max(0, Math.min(1, mix));
+    this.updateCabinetMix();
+  }
+
+  getCabinetIrMix(): number {
+    return this.cabinetIrMix;
   }
 
   getInputLevel(): number {
@@ -406,6 +870,133 @@ export class AudioEngine {
 
   getOutputLevel(): number {
     return this.getLevel(this.outputAnalyser);
+  }
+
+  getOutputPeak(): number {
+    if (!this.outputAnalyser) return 0;
+    const data = new Float32Array(this.outputAnalyser.fftSize);
+    this.outputAnalyser.getFloatTimeDomainData(data);
+    let peak = 0;
+    for (let i = 0; i < data.length; i++) {
+      peak = Math.max(peak, Math.abs(data[i] ?? 0));
+    }
+    return peak;
+  }
+
+  getBaseLatencyMs(): number {
+    return (this.ctx?.baseLatency ?? 0) * 1000;
+  }
+
+  getOutputLatencyMs(): number {
+    const ctxWithOutput = this.ctx as (AudioContext & { outputLatency?: number }) | null;
+    return ((ctxWithOutput?.outputLatency ?? 0) * 1000);
+  }
+
+  getSampleRate(): number {
+    return this.ctx?.sampleRate ?? 0;
+  }
+
+  getActiveNodeEstimate(): number {
+    return this.effects.length + 10;
+  }
+
+  isOutputRecording(): boolean {
+    return this.outputRecorder?.state === 'recording';
+  }
+
+  startOutputRecording(): boolean {
+    if (!this.recordDest || this.outputRecorder?.state === 'recording') return false;
+    const mimeTypes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
+    let mimeType = '';
+    for (const candidate of mimeTypes) {
+      if (MediaRecorder.isTypeSupported(candidate)) {
+        mimeType = candidate;
+        break;
+      }
+    }
+    try {
+      this.outputRecorderChunks = [];
+      this.outputRecorder = mimeType
+        ? new MediaRecorder(this.recordDest.stream, { mimeType })
+        : new MediaRecorder(this.recordDest.stream);
+      this.outputRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) this.outputRecorderChunks.push(event.data);
+      };
+      this.outputRecorder.start(200);
+      return true;
+    } catch {
+      this.outputRecorder = null;
+      this.outputRecorderChunks = [];
+      return false;
+    }
+  }
+
+  async stopOutputRecording(): Promise<Blob | null> {
+    const recorder = this.outputRecorder;
+    if (!recorder || recorder.state !== 'recording') return null;
+
+    return new Promise((resolve) => {
+      recorder.onstop = () => {
+        const blob = this.outputRecorderChunks.length > 0
+          ? new Blob(this.outputRecorderChunks, { type: recorder.mimeType || 'audio/webm' })
+          : null;
+        this.outputRecorderChunks = [];
+        this.outputRecorder = null;
+        resolve(blob);
+      };
+      recorder.stop();
+    });
+  }
+
+  getInputPitchAnalysis(): PitchAnalysis {
+    if (!this.inputAnalyser || !this.ctx) {
+      return { frequency: null, clarity: 0, signal: 0 };
+    }
+
+    const analyser = this.inputAnalyser;
+    const bufferLength = 2048;
+    analyser.fftSize = bufferLength;
+    const data = new Float32Array(bufferLength);
+    analyser.getFloatTimeDomainData(data);
+
+    let rms = 0;
+    for (let i = 0; i < data.length; i++) {
+      rms += data[i] * data[i];
+    }
+    rms = Math.sqrt(rms / data.length);
+    if (rms < 0.01) {
+      return { frequency: null, clarity: 0, signal: rms };
+    }
+
+    const sampleRate = this.ctx.sampleRate;
+    const minLag = Math.floor(sampleRate / 1000);
+    const maxLag = Math.floor(sampleRate / 65);
+    let bestLag = -1;
+    let bestCorrelation = 0;
+
+    for (let lag = minLag; lag <= maxLag; lag++) {
+      let correlation = 0;
+      for (let i = 0; i < data.length - lag; i++) {
+        correlation += data[i]! * data[i + lag]!;
+      }
+      correlation /= data.length - lag;
+
+      if (correlation > bestCorrelation) {
+        bestCorrelation = correlation;
+        bestLag = lag;
+      }
+    }
+
+    const clarity = Math.max(0, Math.min(1, (bestCorrelation - 0.65) / 0.35));
+    if (bestLag === -1 || bestCorrelation < 0.78) {
+      return { frequency: null, clarity, signal: rms };
+    }
+
+    return {
+      frequency: sampleRate / bestLag,
+      clarity,
+      signal: rms,
+    };
   }
 
   private getLevel(analyser: AnalyserNode | null): number {
@@ -441,11 +1032,7 @@ export class AudioEngine {
 
   async switchInput(deviceId: string): Promise<void> {
     if (!this.ctx || !this.sourceNode || !this.mixBus) return;
-
-    this.stream?.getTracks().forEach((t) => t.stop());
-    this.sourceNode.disconnect();
-
-    this.stream = await navigator.mediaDevices.getUserMedia({
+    const nextStream = await navigator.mediaDevices.getUserMedia({
       audio: {
         deviceId: { exact: deviceId },
         echoCancellation: false,
@@ -454,8 +1041,19 @@ export class AudioEngine {
       },
     });
 
-    this.sourceNode = this.ctx.createMediaStreamSource(this.stream);
-    this.sourceNode.connect(this.mixBus);
+    const nextSourceNode = this.ctx.createMediaStreamSource(nextStream);
+    if (this.globalNoiseGateGain && this.globalNoiseGateDetector && this.globalNoiseGateDetectorSink) {
+      nextSourceNode.connect(this.globalNoiseGateGain);
+      nextSourceNode.connect(this.globalNoiseGateDetector);
+      this.globalNoiseGateDetector.connect(this.globalNoiseGateDetectorSink);
+    } else {
+      nextSourceNode.connect(this.mixBus);
+    }
+
+    this.sourceNode.disconnect();
+    this.stream?.getTracks().forEach((t) => t.stop());
+    this.stream = nextStream;
+    this.sourceNode = nextSourceNode;
   }
 
   clearChain(): void {
