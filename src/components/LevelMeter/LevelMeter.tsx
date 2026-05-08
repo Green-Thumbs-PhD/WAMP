@@ -5,11 +5,13 @@ interface LevelMeterProps {
   level: number;
   label: string;
   color?: string;
+  size?: 'compact' | 'large';
 }
 
-export function LevelMeter({ level, label, color = '#55cc55' }: LevelMeterProps) {
+export function LevelMeter({ level, label, color = '#55cc55', size = 'compact' }: LevelMeterProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const smoothedRef = useRef(0);
+  const isLarge = size === 'large';
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -51,11 +53,11 @@ export function LevelMeter({ level, label, color = '#55cc55' }: LevelMeterProps)
   });
 
   return (
-    <div className={styles.container}>
+    <div className={`${styles.container} ${isLarge ? styles.containerLarge : ''}`}>
       <canvas
         ref={canvasRef}
-        width={8}
-        height={80}
+        width={isLarge ? 16 : 8}
+        height={isLarge ? 160 : 80}
         className={styles.canvas}
       />
       <span className={styles.label}>{label}</span>

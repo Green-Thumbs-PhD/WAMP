@@ -51,10 +51,12 @@ export function Header({
     stop,
     masterVolume,
     inputTrim,
+    monoInputToStereo,
     inputMuted,
     muted,
     setMasterVolume,
     setInputTrim,
+    setMonoInputToStereo,
     setInputMuted,
     setMuted,
     inputLevel,
@@ -187,7 +189,6 @@ export function Header({
       </div>
 
       <div className={styles.controlsRow}>
-        <div className={styles.left}>
         <div className={styles.midiSection}>
           <MidiMapper
             isRunning={isRunning}
@@ -213,44 +214,20 @@ export function Header({
             onRecallCompare={onRecallCompare}
           />
         </div>
-        <div className={styles.ioStack}>
-          <button
-            type="button"
-            className={styles.scanBtn}
-            onClick={() => setAudioScanToken((current) => current + 1)}
-          >
-            Scan Audio Connections
-          </button>
-          <div className={styles.selectorRow}>
-            <InputSelector onSelect={onInputSelect} disabled={false} refreshToken={audioScanToken} />
-            <button
-              type="button"
-              className={`${styles.utilityBtn} ${inputMuted ? styles.utilityBtnActive : ''}`}
-              onClick={() => setInputMuted(!inputMuted)}
-              aria-pressed={inputMuted}
-            >
-              Mute MIC
-            </button>
-          </div>
-          <div className={styles.selectorRow}>
-            <OutputSelector onSelect={onOutputSelect} disabled={false} refreshToken={audioScanToken} />
-            <button
-              type="button"
-              className={`${styles.utilityBtn} ${muted ? styles.utilityBtnActive : ''}`}
-              onClick={() => setMuted(!muted)}
-              aria-pressed={muted}
-            >
-              Mute ALL
-            </button>
-          </div>
-        </div>
-        </div>
 
-        <div className={styles.right}>
+        <div className={styles.performanceControls}>
           {isRunning && (
             <>
-              <LevelMeter level={inputLevel} label="IN" />
-              <LevelMeter level={outputLevel} label="OUT" color="#4da6e0" />
+              <button
+                type="button"
+                className={`${styles.channelModeSwitch} ${monoInputToStereo ? styles.channelModeSwitchActive : ''}`}
+                onClick={() => setMonoInputToStereo(!monoInputToStereo)}
+                aria-pressed={monoInputToStereo}
+                title="Send a mono input evenly to both left and right output channels"
+              >
+                <span className={styles.channelModeLabel}>Input</span>
+                <span className={styles.channelModeValue}>{monoInputToStereo ? 'Mono -> Stereo' : 'Stereo'}</span>
+              </button>
               <Knob
                 descriptor={inputTrimDescriptor}
                 value={inputTrim * 100}
@@ -296,6 +273,45 @@ export function Header({
               </div>
             </>
           )}
+        </div>
+
+        {isRunning ? (
+          <div className={styles.meterBridge} aria-label="Input and output meters">
+            <LevelMeter level={inputLevel} label="IN" size="large" />
+            <LevelMeter level={outputLevel} label="OUT" color="#4da6e0" size="large" />
+          </div>
+        ) : null}
+
+        <div className={styles.ioStack}>
+          <button
+            type="button"
+            className={styles.scanBtn}
+            onClick={() => setAudioScanToken((current) => current + 1)}
+          >
+            Scan Audio Connections
+          </button>
+          <div className={styles.selectorRow}>
+            <InputSelector onSelect={onInputSelect} disabled={false} refreshToken={audioScanToken} />
+            <button
+              type="button"
+              className={`${styles.utilityBtn} ${inputMuted ? styles.utilityBtnActive : ''}`}
+              onClick={() => setInputMuted(!inputMuted)}
+              aria-pressed={inputMuted}
+            >
+              Mute MIC
+            </button>
+          </div>
+          <div className={styles.selectorRow}>
+            <OutputSelector onSelect={onOutputSelect} disabled={false} refreshToken={audioScanToken} />
+            <button
+              type="button"
+              className={`${styles.utilityBtn} ${muted ? styles.utilityBtnActive : ''}`}
+              onClick={() => setMuted(!muted)}
+              aria-pressed={muted}
+            >
+              Mute ALL
+            </button>
+          </div>
         </div>
       </div>
     </header>

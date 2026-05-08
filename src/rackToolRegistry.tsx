@@ -1,7 +1,6 @@
 import type { ComponentType } from 'react';
 import type { RackToolFeatureFlag } from './config/features';
-import { AmpChannelSelector } from './components/AmpChannelSelector/AmpChannelSelector';
-import { IRLoader } from './components/IRLoader/IRLoader';
+import { AmpCabManager } from './components/AmpCabManager/AmpCabManager';
 import { GlobalNoiseGate } from './components/GlobalNoiseGate/GlobalNoiseGate';
 import { InputOutputMonitor } from './components/InputOutputMonitor/InputOutputMonitor';
 import { OutputRecorder } from './components/OutputRecorder/OutputRecorder';
@@ -24,16 +23,10 @@ export const RACK_TOOL_REGISTRY: RackToolDefinition[] = [
     featureFlag: 'metronomeBar',
   },
   {
-    id: 'amp-channel-selector',
-    label: 'Amp Channel',
-    component: AmpChannelSelector,
+    id: 'amp-cab-manager',
+    label: 'AMP CHANNEL / CAB IR MANAGER',
+    component: AmpCabManager,
     featureFlag: 'ampChannelSelector',
-  },
-  {
-    id: 'cab-ir-loader',
-    label: 'Cab IR Manager',
-    component: IRLoader,
-    featureFlag: 'cabIrLoader',
   },
   {
     id: 'global-noise-gate',
@@ -55,7 +48,7 @@ export const RACK_TOOL_REGISTRY: RackToolDefinition[] = [
   },
   {
     id: 'looper-panel',
-    label: 'Looper',
+    label: 'LOOPER / BACKING TRACK PRACTICE',
     component: LooperPanel,
     featureFlag: 'looperPanel',
   },

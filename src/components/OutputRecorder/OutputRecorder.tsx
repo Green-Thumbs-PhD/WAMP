@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import styles from './OutputRecorder.module.css';
 import { useAudioEngineContext } from '../../context/AudioEngineContext';
+import { getSupportedOutputRecordingMimeType, type OutputRecordingFormat } from '../../audio/AudioEngine';
 
 const VISUALIZER_SAMPLES = 80;
 const SAMPLE_INTERVAL_MS = 85;
@@ -17,6 +18,71 @@ function buildSeedBars(length: number): number[] {
   return Array.from({ length }, () => 0);
 }
 
+function replaceExtension(filename: string, extension: string): string {
+  return `${filename.replace(/\.[^.]+$/, '') || 'wamp-output'}.${extension}`;
+}
+
+function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+async function decodeBlob(blob: Blob): Promise<AudioBuffer> {
+  const audioContext = new AudioContext();
+  try {
+    const arrayBuffer = await blob.arrayBuffer();
+    return await audioContext.decodeAudioData(arrayBuffer.slice(0));
+  } finally {
+    void audioContext.close();
+  }
+}
+
+function writeString(view: DataView, offset: number, value: string): void {
+  for (let i = 0; i < value.length; i++) {
+    view.setUint8(offset + i, value.charCodeAt(i));
+  }
+}
+
+function encodeWav(audioBuffer: AudioBuffer): Blob {
+  const channelCount = audioBuffer.numberOfChannels;
+  const sampleRate = audioBuffer.sampleRate;
+  const frameCount = audioBuffer.length;
+  const bytesPerSample = 2;
+  const blockAlign = channelCount * bytesPerSample;
+  const dataSize = frameCount * blockAlign;
+  const buffer = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(buffer);
+
+  writeString(view, 0, 'RIFF');
+  view.setUint32(4, 36 + dataSize, true);
+  writeString(view, 8, 'WAVE');
+  writeString(view, 12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, channelCount, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * blockAlign, true);
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, 16, true);
+  writeString(view, 36, 'data');
+  view.setUint32(40, dataSize, true);
+
+  let offset = 44;
+  for (let frame = 0; frame < frameCount; frame++) {
+    for (let channel = 0; channel < channelCount; channel++) {
+      const sample = Math.max(-1, Math.min(1, audioBuffer.getChannelData(channel)[frame] ?? 0));
+      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+      offset += bytesPerSample;
+    }
+  }
+
+  return new Blob([buffer], { type: 'audio/wav' });
+}
+
 export function OutputRecorder() {
   const {
     isRunning,
@@ -26,6 +92,7 @@ export function OutputRecorder() {
     outputRecorderDuration,
     lastRecordingUrl,
     lastRecordingName,
+    lastRecordingBlob,
     lastRecordingDuration,
     startOutputRecording,
     stopOutputRecording,
@@ -35,9 +102,12 @@ export function OutputRecorder() {
   const [isPlaybackActive, setIsPlaybackActive] = useState(false);
   const [playbackPosition, setPlaybackPosition] = useState(0);
   const [playbackDuration, setPlaybackDuration] = useState(0);
+  const [recordingFormat, setRecordingFormat] = useState<OutputRecordingFormat>('webm');
+  const [exportBusy, setExportBusy] = useState(false);
   const outputLevelRef = useRef(0);
   const outputPeakRef = useRef(0);
   const playbackRef = useRef<HTMLAudioElement | null>(null);
+  const mp3Supported = useMemo(() => Boolean(getSupportedOutputRecordingMimeType('mp3')), []);
 
   useEffect(() => {
     outputLevelRef.current = outputLevel;
@@ -125,6 +195,20 @@ export function OutputRecorder() {
       : 'Hit record to capture the processed output from the full rig.';
   const peakPercent = `${Math.round(outputPeak * 100)}%`;
   const elapsedBars = useMemo(() => levelHistory.some((value) => value > 0.05), [levelHistory]);
+  const hasMp3Take = Boolean(lastRecordingBlob?.type.includes('mpeg') || lastRecordingBlob?.type.includes('mp3'));
+  const sourceExportLabel = hasMp3Take ? 'Export MP3' : 'Export WebM';
+
+  const exportWav = async () => {
+    if (!lastRecordingBlob) return;
+    setExportBusy(true);
+    try {
+      const audioBuffer = await decodeBlob(lastRecordingBlob);
+      const wavBlob = encodeWav(audioBuffer);
+      downloadBlob(wavBlob, replaceExtension(lastRecordingName || 'wamp-output.webm', 'wav'));
+    } finally {
+      setExportBusy(false);
+    }
+  };
 
   if (!isRunning) return null;
 
@@ -184,15 +268,26 @@ export function OutputRecorder() {
       </div>
 
       <div className={styles.transportDeck}>
+        <label className={styles.formatControl}>
+          <span>Format</span>
+          <select
+            value={recordingFormat}
+            onChange={(event) => setRecordingFormat(event.target.value as OutputRecordingFormat)}
+            disabled={outputRecorderActive}
+          >
+            <option value="webm">WebM</option>
+            <option value="mp3" disabled={!mp3Supported}>MP3</option>
+          </select>
+        </label>
         <button
           type="button"
           className={`${styles.transportBtn} ${styles.transportRecord} ${outputRecorderActive ? styles.recording : ''}`}
           onClick={() => {
             if (outputRecorderActive) return;
-            const started = startOutputRecording();
+            const started = startOutputRecording(recordingFormat);
             if (started) setLevelHistory(buildSeedBars(VISUALIZER_SAMPLES));
           }}
-          disabled={outputRecorderActive}
+          disabled={outputRecorderActive || (recordingFormat === 'mp3' && !mp3Supported)}
         >
           <span className={styles.transportIcon}>●</span>
           Record
@@ -227,9 +322,32 @@ export function OutputRecorder() {
         {lastRecordingUrl ? (
           <a className={`${styles.transportBtn} ${styles.transportExport}`} href={lastRecordingUrl} download={lastRecordingName || 'wamp-output.webm'}>
             <span className={styles.transportIcon}>↧</span>
-            Export
+            {sourceExportLabel}
           </a>
         ) : null}
+        <button
+          type="button"
+          className={`${styles.transportBtn} ${styles.transportExport}`}
+          onClick={() => void exportWav()}
+          disabled={outputRecorderActive || !lastRecordingBlob || exportBusy}
+        >
+          <span className={styles.transportIcon}>W</span>
+          {exportBusy ? 'Preparing WAV' : 'Export WAV'}
+        </button>
+        <button
+          type="button"
+          className={`${styles.transportBtn} ${styles.transportExport}`}
+          onClick={() => {
+            if (lastRecordingBlob && hasMp3Take) {
+              downloadBlob(lastRecordingBlob, replaceExtension(lastRecordingName || 'wamp-output.mp3', 'mp3'));
+            }
+          }}
+          disabled={outputRecorderActive || !lastRecordingBlob || !hasMp3Take}
+          title={mp3Supported ? 'Select MP3 before recording to create an MP3 take.' : 'MP3 recording is not supported by this browser.'}
+        >
+          <span className={styles.transportIcon}>M</span>
+          Export MP3
+        </button>
         <button
           type="button"
           className={`${styles.transportBtn} ${styles.transportClear}`}
@@ -248,6 +366,9 @@ export function OutputRecorder() {
           Clear take
         </button>
       </div>
+      <p className={styles.formatNote}>
+        WAV exports are converted from the current take. MP3 export requires recording the take as MP3 in a browser that supports audio/mpeg.
+      </p>
       <audio ref={playbackRef} src={lastRecordingUrl || undefined} preload="metadata" className={styles.hiddenAudio} />
 
       <div className={styles.metaRow}>
