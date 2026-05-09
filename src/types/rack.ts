@@ -1,6 +1,7 @@
 export interface RackState {
   masterVolume: number;
   inputTrim: number;
+  monoInputToStereo: boolean;
   inputMuted: boolean;
   muted: boolean;
   ampChannel: 'clean' | 'crunch' | 'lead';
@@ -23,6 +24,7 @@ export function createDefaultRackState(): RackState {
   return {
     masterVolume: 1,
     inputTrim: 1,
+    monoInputToStereo: false,
     inputMuted: false,
     muted: false,
     ampChannel: 'clean',
@@ -48,6 +50,7 @@ export function normalizeRackState(rack?: Partial<RackState> | null): RackState 
   return {
     masterVolume: rack?.masterVolume ?? defaults.masterVolume,
     inputTrim: rack?.inputTrim ?? defaults.inputTrim,
+    monoInputToStereo: rack?.monoInputToStereo ?? defaults.monoInputToStereo,
     inputMuted: rack?.inputMuted ?? defaults.inputMuted,
     muted: rack?.muted ?? defaults.muted,
     ampChannel: rack?.ampChannel ?? defaults.ampChannel,

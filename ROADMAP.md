@@ -27,6 +27,10 @@ These items shape the long-term structure of the app and make future features ea
   Purpose: Make optional features easy to hide or remove later.
 - [x] `P2` Better persistence model
   Purpose: Separate pedal chain, rack state, and user libraries more cleanly in storage.
+- [x] `P2` Theme preset registry
+  Purpose: Let the app switch between four stylized UI presets: The Stack, Cyberpunk, Ghetto Blaster, and Polar Signal.
+- [x] `P2` Saved rack layout controls
+  Purpose: Allow rack tools to be reordered, minimized, and restored as part of local performance settings.
 
 ## Phase 1: High-Impact Usability
 
@@ -68,9 +72,9 @@ These features belong in the simulated amp rack and should each live in their ow
 - [x] `P2` Recorder / export tool
   Purpose: Capture wet output directly from the app.
 - [x] `P2` Input monitor / gain staging meter
-  Purpose: Help users set healthy levels before effects.
+  Purpose: Help users set healthy levels before effects with dB readouts, headroom, target-zone metering, input history, trim controls, and mic mute.
 - [x] `P2` Output safety / limiter monitor
-  Purpose: Prevent accidental clipping and harsh output spikes.
+  Purpose: Prevent accidental clipping and harsh output spikes with peak hold, warning zones, output history, quick trim actions, panic mute, and reset hold.
 - [x] `P3` MIDI / external controller mapping
   Purpose: Support foot controllers, knobs, and preset switching from hardware.
 - [x] `P3` CPU / latency monitor
@@ -196,8 +200,12 @@ These ideas expand WAMP beyond guitar input into a broader playable instrument e
   Purpose: Tune the rack and effects defaults toward low-frequency instruments.
 - [ ] `P2` Sample instrument rack
   Purpose: Turn imported one-shots or loops into playable keyboard zones.
-- [ ] `P3` Drum machine sequencer
-  Purpose: Move from trigger pads to programmable rhythmic backing with step sequencing.
+- [x] `P2` Drum pad kit / session import and export
+  Purpose: Save and reload drum kit choice, custom pad buffers, lane assignments, and sequencer patterns as JSON.
+- [x] `P2` Mic capture to drum pads
+  Purpose: Capture one second of current input into a selected pad for quick custom one-shots.
+- [x] `P3` Drum machine sequencer
+  Purpose: Move from trigger pads to an 8-lane, 16-step sequencer where each lane can target any of the 16 pads.
 - [ ] `P3` Chord generator / strum engine
   Purpose: Create playable accompaniment and songwriting sketches from a keyboard or pad input.
 
@@ -222,10 +230,10 @@ These features deepen the MIDI side beyond simple control mapping.
 
 These tools build on the existing rack identity and make the app smarter and more studio-like.
 
-- [ ] `P1` Dedicated input monitor / gain staging meter
-  Purpose: Finish the missing Phase 2 meter tool with clearer headroom targets and clipping warnings.
-- [ ] `P1` Output safety / limiter monitor
-  Purpose: Finish the missing Phase 2 output protection tool with visible peak warnings and safety options.
+- [x] `P1` Dedicated input monitor / gain staging meter
+  Purpose: Implemented as the input side of the combined INPUT MONITOR / OUTPUT SAFETY rack slot, with clear headroom targets and status guidance.
+- [x] `P1` Output safety / limiter monitor
+  Purpose: Implemented as the output side of the combined INPUT MONITOR / OUTPUT SAFETY rack slot, with visible peak warnings and safety options.
 - [ ] `P1` Spectrum analyzer / EQ view
   Purpose: Show live tonal balance for guitar, synth, drums, and recorded output.
 - [ ] `P2` Noise / hum detector
@@ -260,10 +268,12 @@ These ideas build the board into a deeper modular rig.
 
 These features improve retention by making WAMP useful even when users are not just building tones.
 
-- [ ] `P1` Backing track player
-  Purpose: Load songs or loops and practice through the same rig without another app.
-- [ ] `P1` Section looper / practice markers
-  Purpose: Repeat song passages for targeted practice sessions.
+- [x] `P1` Backing track player
+  Purpose: Load songs or loops, play / pause / stop, control volume and speed, seek through the waveform, and practice through the same rig without another app.
+- [x] `P1` Section looper / practice markers
+  Purpose: Mark section start and end points on a backing track and repeat song passages for targeted practice sessions.
+- [x] `P1` Post-FX looper with visual trim
+  Purpose: Capture processed loops, choose record length, preview waveform peaks, trim loop start / end, apply trims, and set loop playback level.
 - [ ] `P2` Tempo trainer
   Purpose: Gradually increase BPM over time for riff, scale, and timing practice.
 - [ ] `P2` Pitch accuracy history
@@ -277,8 +287,8 @@ These features improve retention by making WAMP useful even when users are not j
 
 These features make the app more likely to spread between users.
 
-- [ ] `P1` Preset export bundles with metadata
-  Purpose: Package rigs with tags, notes, and IR references for sharing.
+- [x] `P1` Preset export bundles with metadata
+  Purpose: Package rigs with categories, tags, descriptions, notes, chain state, rack state, and local cabinet IR identifiers for sharing or backup.
 - [ ] `P2` Comment-ready preset summaries
   Purpose: Generate compact descriptions users can post with shared rigs or recordings.
 - [ ] `P2` Embedded share player
@@ -292,8 +302,8 @@ These are optional paths if the product ever needs a stronger premium identity o
 
 - [ ] `P2` Signature rig collections
   Purpose: Group premium-feeling boards and rack setups around named sonic identities.
-- [ ] `P2` Premium visual skins and rack faces
-  Purpose: Add stronger personalization and perceived product depth.
+- [x] `P2` Premium visual skins and rack faces
+  Purpose: Add stronger personalization and perceived product depth through The Stack, Cyberpunk, Ghetto Blaster, and Polar Signal theme presets.
 - [ ] `P3` Account-based cloud sync
   Purpose: Move presets, favorites, tags, MIDI mappings, and IR references beyond one browser.
 - [ ] `P3` Marketplace-style preset exchange
@@ -332,9 +342,23 @@ Add new items here whenever a limitation, restriction, or temporary workaround i
   Impact: External controller mapping may be unavailable in unsupported browsers or until MIDI permission is granted, and mappings are saved locally in this browser profile.
 - [ ] Output recording and export depend on the browser MediaRecorder API and supported audio container formats.
   Impact: Wet-output capture works in modern browsers, but export format and availability may vary by browser.
+- [ ] Output recorder currently keeps one active exported take rather than a multi-take shelf.
+  Impact: Users can play, export, or clear the current take, but previous takes are replaced instead of being preserved for comparison.
+- [ ] Input monitor and output safety are implemented as one combined rack slot even though some roadmap wording refers to dedicated tools.
+  Impact: The current experience is compact and functional, but users cannot independently reorder or hide the input and output halves.
+- [ ] Drum pad sessions export kit buffers, lane assignments, and pattern data locally, but they are not part of the main preset bundle yet.
+  Impact: A full performance rig and a drum session may need to be exported separately.
+- [ ] Drum sequencer patterns and imported drum sessions are browser-session UI state, not automatically restored from persistent app storage.
+  Impact: Users should export a drum session when they want to preserve a pattern or custom kit across future work.
+- [ ] Backing tracks are loaded from local files for the current session and are not stored in presets or browser storage.
+  Impact: Users need to reload the backing audio file after a refresh or on another device.
+- [ ] Theme selection is local to the current browser profile.
+  Impact: UI skin preference persists on this machine, but it does not sync across browsers or devices.
 - [ ] The current spillover strategy is a tail-safe wait before preset replacement rather than a fully seamless dual-engine crossfade.
   Impact: Delay and reverb tails are given time to decay more naturally before a preset swap, but they are not preserved under the new rig indefinitely.
 - [ ] The top-right CPU monitor is an in-app estimate based on latency, frame timing, and graph size rather than a hardware-level CPU reading.
   Impact: It is useful for relative performance tracking inside the app, but it should not be treated as an exact system CPU measurement.
 - [ ] In the current Codex workspace environment, Vite commands may fail inside the sandbox with `spawn EPERM`.
   Impact: `npm run build` and `npm run dev` may require unrestricted execution from the assistant environment even though the project itself is valid.
+
+PS: Current improvement areas worth tracking: keyboard shortcuts are documented but still not user-remappable from the UI, live scene stepping is not exposed as a MIDI mapping target, rack layout persistence covers order and minimized state but not per-tool visibility toggles, preset export includes local cabinet IR identifiers but not portable IR binary payloads, and the app now has several strong local-only workflows that would benefit from a future cloud or share-link layer if WAMP moves beyond single-browser use.

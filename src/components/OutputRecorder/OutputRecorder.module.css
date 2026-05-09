@@ -214,12 +214,43 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.6rem;
+  align-items: center;
   padding: 0.7rem;
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background:
     linear-gradient(180deg, rgba(241, 223, 190, 0.08), rgba(255, 255, 255, 0.01) 36%),
     linear-gradient(180deg, #2c2f34, #17191d 68%, #111318);
+}
+
+.formatControl {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.2);
+  color: #f7e8c8;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.formatControl select {
+  font: inherit;
+  border-radius: 8px;
+  border: 1px solid #4a4134;
+  background: #1d1b19;
+  color: #f7e8c8;
+  padding: 0.28rem 0.45rem;
+}
+
+.formatNote {
+  margin: -0.45rem 0 0;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: #9ca2ab;
 }
 
 .transportBtn {

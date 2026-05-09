@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AudioEngine } from '../audio/AudioEngine';
+import { AudioEngine, type OutputRecordingFormat } from '../audio/AudioEngine';
 import type { EffectType, EffectSlotState } from '../types/effects';
 import type { PresetEffectSlot, RigSnapshot } from '../types/presets';
 import type { RackState } from '../types/rack';
@@ -41,6 +41,7 @@ export function useAudioEngine() {
   const [lockedPedalIds, setLockedPedalIds] = useState<string[]>([]);
   const [masterVolume, setMasterVolumeState] = useState(sessionRackRef.current.masterVolume);
   const [inputTrim, setInputTrimState] = useState(sessionRackRef.current.inputTrim);
+  const [monoInputToStereo, setMonoInputToStereoState] = useState(sessionRackRef.current.monoInputToStereo);
   const [inputMuted, setInputMutedState] = useState(sessionRackRef.current.inputMuted);
   const [muted, setMutedState] = useState(sessionRackRef.current.muted);
   const [ampChannel, setAmpChannelState] = useState(sessionRackRef.current.ampChannel);
@@ -99,6 +100,7 @@ export function useAudioEngine() {
   const [outputRecorderDuration, setOutputRecorderDuration] = useState(0);
   const [lastRecordingUrl, setLastRecordingUrl] = useState('');
   const [lastRecordingName, setLastRecordingName] = useState('');
+  const [lastRecordingBlob, setLastRecordingBlob] = useState<Blob | null>(null);
   const [lastRecordingDuration, setLastRecordingDuration] = useState(0);
   const [performanceSnapshot, setPerformanceSnapshot] = useState({
     baseLatencyMs: 0,
@@ -230,6 +232,7 @@ export function useAudioEngine() {
 
     engineRef.current.setMasterVolume(nextRack.masterVolume);
     engineRef.current.setInputTrim(nextRack.inputTrim);
+    engineRef.current.setMonoInputToStereo(nextRack.monoInputToStereo);
     engineRef.current.setInputMuted(nextRack.inputMuted);
     engineRef.current.setMuted(nextRack.muted);
     engineRef.current.setAmpChannel(nextRack.ampChannel);
@@ -249,6 +252,7 @@ export function useAudioEngine() {
 
     setMasterVolumeState(nextRack.masterVolume);
     setInputTrimState(nextRack.inputTrim);
+    setMonoInputToStereoState(engineRef.current.isMonoInputToStereo());
     setInputMutedState(engineRef.current.isInputMuted());
     setMutedState(nextRack.muted);
     setAmpChannelState(engineRef.current.getAmpChannel());
@@ -446,6 +450,13 @@ export function useAudioEngine() {
     engineRef.current.setInputTrim(value);
     setInputTrimState(value);
     updateSessionRack({ inputTrim: value });
+  }, [updateSessionRack]);
+
+  const setMonoInputToStereo = useCallback((value: boolean) => {
+    engineRef.current.setMonoInputToStereo(value);
+    const nextValue = engineRef.current.isMonoInputToStereo();
+    setMonoInputToStereoState(nextValue);
+    updateSessionRack({ monoInputToStereo: nextValue });
   }, [updateSessionRack]);
 
   const setInputMuted = useCallback((value: boolean) => {
@@ -800,8 +811,8 @@ export function useAudioEngine() {
     updateSessionRack({ cabinetIrMix: nextMix });
   }, [updateSessionRack]);
 
-  const startOutputRecording = useCallback(() => {
-    const started = engineRef.current.startOutputRecording();
+  const startOutputRecording = useCallback((format: OutputRecordingFormat = 'webm') => {
+    const started = engineRef.current.startOutputRecording(format);
     if (started) {
       outputRecordingStartedAtRef.current = performance.now();
       setOutputRecorderActive(true);
@@ -823,8 +834,10 @@ export function useAudioEngine() {
     if (lastRecordingUrl) URL.revokeObjectURL(lastRecordingUrl);
     const url = URL.createObjectURL(blob);
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const extension = blob.type.includes('mpeg') || blob.type.includes('mp3') ? 'mp3' : 'webm';
     setLastRecordingUrl(url);
-    setLastRecordingName(`wamp-output-${stamp}.webm`);
+    setLastRecordingBlob(blob);
+    setLastRecordingName(`wamp-output-${stamp}.${extension}`);
     return { url, blob };
   }, [lastRecordingUrl]);
 
@@ -834,6 +847,7 @@ export function useAudioEngine() {
     setOutputRecorderDuration(0);
     setLastRecordingDuration(0);
     setLastRecordingName('');
+    setLastRecordingBlob(null);
     setLastRecordingUrl((current) => {
       if (current) URL.revokeObjectURL(current);
       return '';
@@ -938,6 +952,7 @@ export function useAudioEngine() {
     lockedPedalIds,
     masterVolume,
     inputTrim,
+    monoInputToStereo,
     inputMuted,
     muted,
     ampChannel,
@@ -969,6 +984,7 @@ export function useAudioEngine() {
     outputRecorderDuration,
     lastRecordingUrl,
     lastRecordingName,
+    lastRecordingBlob,
     lastRecordingDuration,
     performanceSnapshot,
     start,
@@ -987,6 +1003,7 @@ export function useAudioEngine() {
     isEffectLocked,
     setMasterVolume,
     setInputTrim,
+    setMonoInputToStereo,
     setInputMuted,
     setMuted,
     setAmpChannel,

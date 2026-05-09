@@ -5,9 +5,17 @@
   gap: 4px;
 }
 
+.containerLarge {
+  gap: 7px;
+}
+
 .canvas {
   border-radius: 2px;
   border: 1px solid color-mix(in srgb, var(--theme-card-border) 60%, #333);
+}
+
+.containerLarge .canvas {
+  border-radius: 4px;
 }
 
 .label {
@@ -15,4 +23,9 @@
   color: var(--theme-card-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+.containerLarge .label {
+  font-size: 11px;
+  letter-spacing: 0.08em;
 }

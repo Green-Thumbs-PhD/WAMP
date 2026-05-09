@@ -6,11 +6,29 @@ import { PostChainLooper, type LooperState, type LooperStatus } from './PostChai
 import { MetronomeEngine } from './MetronomeEngine';
 import { buildFactoryKit, type DrumKitPresetId } from './DrumKit';
 
+export type OutputRecordingFormat = 'webm' | 'mp3';
+
+const OUTPUT_RECORDING_MIME_TYPES: Record<OutputRecordingFormat, string[]> = {
+  webm: ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'],
+  mp3: ['audio/mpeg', 'audio/mp3'],
+};
+
+export function getSupportedOutputRecordingMimeType(format: OutputRecordingFormat): string {
+  const candidates = OUTPUT_RECORDING_MIME_TYPES[format];
+  for (const candidate of candidates) {
+    if (MediaRecorder.isTypeSupported(candidate)) return candidate;
+  }
+  return format === 'webm' ? '' : '';
+}
+
 export class AudioEngine {
   private ctx: AudioContext | null = null;
   private stream: MediaStream | null = null;
   private sourceNode: MediaStreamAudioSourceNode | null = null;
   private mixBus: GainNode | null = null;
+  private inputModeNode: GainNode | null = null;
+  private monoSumNode: GainNode | null = null;
+  private monoMergerNode: ChannelMergerNode | null = null;
   private padBus: GainNode | null = null;
   private padsThroughChain = false;
   private globalNoiseGateGain: GainNode | null = null;
@@ -32,6 +50,7 @@ export class AudioEngine {
   private effects: EffectNode[] = [];
   private masterVolume = 1;
   private inputTrim = 1;
+  private monoInputToStereo = false;
   private inputMuted = false;
   private muted = false;
   private ampChannel: 'clean' | 'crunch' | 'lead' = 'clean';
@@ -82,6 +101,13 @@ export class AudioEngine {
 
     this.mixBus = this.ctx.createGain();
     this.mixBus.gain.value = 1;
+    this.inputModeNode = this.ctx.createGain();
+    this.inputModeNode.gain.value = 1;
+    this.monoSumNode = this.ctx.createGain();
+    this.monoSumNode.channelCount = 1;
+    this.monoSumNode.channelCountMode = 'explicit';
+    this.monoSumNode.channelInterpretation = 'speakers';
+    this.monoMergerNode = this.ctx.createChannelMerger(2);
     this.padBus = this.ctx.createGain();
     this.padBus.gain.value = 1;
 
@@ -152,10 +178,11 @@ export class AudioEngine {
     };
 
     this.sourceNode.connect(this.globalNoiseGateGain);
-    this.globalNoiseGateGain.connect(this.mixBus);
+    this.globalNoiseGateGain.connect(this.inputModeNode);
     this.sourceNode.connect(this.globalNoiseGateDetector);
     this.globalNoiseGateDetector.connect(this.globalNoiseGateDetectorSink);
     this.globalNoiseGateDetectorSink.connect(this.ctx.destination);
+    this.applyInputChannelMode();
     this.mixBus.connect(this.inputGain);
     this.inputGain.connect(this.inputAnalyser);
     this.configureAmpVoicing();
@@ -206,6 +233,9 @@ export class AudioEngine {
     this.stream = null;
     this.sourceNode = null;
     this.mixBus = null;
+    this.inputModeNode = null;
+    this.monoSumNode = null;
+    this.monoMergerNode = null;
     this.padBus = null;
     this.globalNoiseGateGain = null;
     this.globalNoiseGateDetector = null;
@@ -258,6 +288,36 @@ export class AudioEngine {
 
   getPadsThroughChain(): boolean {
     return this.padsThroughChain;
+  }
+
+  setMonoInputToStereo(enabled: boolean): void {
+    this.monoInputToStereo = enabled;
+    if (this.isRunning()) this.applyInputChannelMode();
+  }
+
+  isMonoInputToStereo(): boolean {
+    return this.monoInputToStereo;
+  }
+
+  private applyInputChannelMode(): void {
+    if (!this.inputModeNode || !this.mixBus || !this.monoSumNode || !this.monoMergerNode) return;
+    try {
+      this.inputModeNode.disconnect();
+      this.monoSumNode.disconnect();
+      this.monoMergerNode.disconnect();
+    } catch {
+      /* ignore */
+    }
+
+    if (this.monoInputToStereo) {
+      this.inputModeNode.connect(this.monoSumNode);
+      this.monoSumNode.connect(this.monoMergerNode, 0, 0);
+      this.monoSumNode.connect(this.monoMergerNode, 0, 1);
+      this.monoMergerNode.connect(this.mixBus);
+      return;
+    }
+
+    this.inputModeNode.connect(this.mixBus);
   }
 
   setGlobalNoiseGateEnabled(enabled: boolean): void {
@@ -904,16 +964,10 @@ export class AudioEngine {
     return this.outputRecorder?.state === 'recording';
   }
 
-  startOutputRecording(): boolean {
+  startOutputRecording(format: OutputRecordingFormat = 'webm'): boolean {
     if (!this.recordDest || this.outputRecorder?.state === 'recording') return false;
-    const mimeTypes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
-    let mimeType = '';
-    for (const candidate of mimeTypes) {
-      if (MediaRecorder.isTypeSupported(candidate)) {
-        mimeType = candidate;
-        break;
-      }
-    }
+    const mimeType = getSupportedOutputRecordingMimeType(format);
+    if (format === 'mp3' && !mimeType) return false;
     try {
       this.outputRecorderChunks = [];
       this.outputRecorder = mimeType

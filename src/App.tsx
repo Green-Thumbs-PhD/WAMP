@@ -342,12 +342,6 @@ function App() {
                       key={tool.id}
                       className={`rack-slot ${isMinimized ? 'rack-slot-minimized' : ''} ${isDragging ? 'rack-slot-dragging' : ''}`}
                       data-tool-id={tool.id}
-                      draggable
-                      onDragStart={(event) => {
-                        setDraggedToolId(tool.id);
-                        event.dataTransfer.effectAllowed = 'move';
-                        event.dataTransfer.setData('text/plain', tool.id);
-                      }}
                       onDragOver={(event) => {
                         event.preventDefault();
                         event.dataTransfer.dropEffect = 'move';
@@ -358,6 +352,19 @@ function App() {
                       }}
                       onDragEnd={() => setDraggedToolId(null)}
                     >
+                      <div
+                        className="rack-slot-drag-frame"
+                        draggable
+                        aria-label={`Reorder ${tool.label}`}
+                        role="button"
+                        tabIndex={0}
+                        onDragStart={(event) => {
+                          setDraggedToolId(tool.id);
+                          event.dataTransfer.effectAllowed = 'move';
+                          event.dataTransfer.setData('text/plain', tool.id);
+                        }}
+                        onDragEnd={() => setDraggedToolId(null)}
+                      />
                       <span className="rack-slot-label">{tool.label}</span>
                       <button
                         type="button"
